@@ -24,52 +24,7 @@ const DEFAULT_ADMIN = {
   updatedAt: new Date().toISOString()
 };
 
-const DEFAULT_AGENTS = [
-  {
-    id: 1,
-    name: 'Sarah Khan',
-    role: 'Senior Sales Executive',
-    email: 'sarah.khan@leadspro.com',
-    phone: '0301-8273645',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    color: 'emerald',
-    pin: '1234',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 2,
-    name: 'Hamza Tariq',
-    role: 'Corporate Closer',
-    email: 'hamza.tariq@leadspro.com',
-    phone: '0322-9182734',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    color: 'blue',
-    pin: '1234',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 3,
-    name: 'Ayesha Malik',
-    role: 'Key Account Manager',
-    email: 'ayesha.malik@leadspro.com',
-    phone: '0333-7261524',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    color: 'amber',
-    pin: '1234',
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 4,
-    name: 'Bilal Ahmed',
-    role: 'Client Representative',
-    email: 'bilal.ahmed@leadspro.com',
-    phone: '0345-6152431',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    color: 'violet',
-    pin: '1234',
-    createdAt: new Date().toISOString()
-  }
-];
+const DEFAULT_AGENTS = [];
 
 class R2DatabaseService {
   constructor() {
