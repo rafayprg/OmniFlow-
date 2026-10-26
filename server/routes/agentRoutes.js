@@ -1,62 +1,39 @@
 import express from 'express';
-import { Agent } from '../models/Agent.js';
-import { Customer } from '../models/Customer.js';
-import { Lead } from '../models/Lead.js';
+import { r2Db } from '../services/r2DatabaseService.js';
 
 const router = express.Router();
 
-// GET all agents strictly from MongoDB
+// GET all agents strictly from Cloudflare R2
 router.get('/', async (req, res) => {
   try {
-    const agents = await Agent.find().sort({ id: 1 });
+    const agents = await r2Db.getAgents();
     res.json({
       success: true,
       count: agents.length,
       data: agents,
-      source: 'mongodb'
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST create new agent strictly to MongoDB
+// POST create new agent strictly to Cloudflare R2
 router.post('/', async (req, res) => {
   try {
-    const { name, role, email, phone, avatar, color, pin } = req.body;
+    const { name } = req.body;
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, error: 'Name is required' });
     }
 
-    const defaultAvatars = [
-      "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80",
-      "https://images.unsplash.com/photo-1628157582853-a796fa650a6a?w=150&auto=format&fit=crop&q=80"
-    ];
-
-    const lastAgent = await Agent.findOne().sort({ id: -1 });
-    const nextId = lastAgent ? lastAgent.id + 1 : 1;
-    const pickedAvatar = avatar || defaultAvatars[nextId % defaultAvatars.length];
-
-    const newAgent = await Agent.create({
-      id: nextId,
-      name: name.trim(),
-      role: role ? role.trim() : 'Sales Representative',
-      email: email ? email.trim() : '',
-      phone: phone ? phone.trim() : '0300-1234567',
-      avatar: pickedAvatar,
-      color: color || 'blue',
-      pin: pin ? String(pin).trim() : '1234'
-    });
-
-    res.status(201).json({ success: true, data: newAgent });
+    const newAgent = await r2Db.addAgent(req.body);
+    res.status(201).json({ success: true, data: newAgent, source: 'cloudflare-r2' });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// PUT update agent PIN strictly in MongoDB
+// PUT update agent PIN strictly in Cloudflare R2
 router.put('/:id/pin', async (req, res) => {
   try {
     const { id } = req.params;
@@ -66,94 +43,100 @@ router.put('/:id/pin', async (req, res) => {
       return res.status(400).json({ success: false, error: 'PIN is required' });
     }
 
-    const pinStr = String(pin).trim();
-
-    const updated = await Agent.findOneAndUpdate(
-      { id: Number(id) },
-      { $set: { pin: pinStr } },
-      { new: true }
-    );
+    const updated = await r2Db.updateAgentPin(id, pin);
 
     if (!updated) {
-      return res.status(404).json({ success: false, error: 'Agent not found in MongoDB' });
+      return res.status(404).json({ success: false, error: 'Agent not found in Cloudflare R2' });
     }
 
     res.json({
       success: true,
-      message: `PIN updated to ${pinStr} in MongoDB`,
-      data: updated
+      message: `PIN updated to ${pin} in Cloudflare R2`,
+      data: updated,
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PUT update agent profile strictly in MongoDB
+// PUT update agent profile strictly in Cloudflare R2
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, role, email, phone, avatar, pin } = req.body;
+    const agents = await r2Db.getAgents();
+    const existingAgent = agents.find(a => Number(a.id) === Number(id));
 
-    const existingAgent = await Agent.findOne({ id: Number(id) });
     if (!existingAgent) {
       return res.status(404).json({ success: false, error: 'Agent not found' });
     }
 
     const oldName = existingAgent.name;
-    const newName = name ? name.trim() : oldName;
-
-    const updated = await Agent.findOneAndUpdate(
-      { id: Number(id) },
-      {
-        $set: {
-          name: newName,
-          ...(role ? { role: role.trim() } : {}),
-          ...(email ? { email: email.trim() } : {}),
-          ...(phone ? { phone: phone.trim() } : {}),
-          ...(avatar ? { avatar } : {}),
-          ...(pin ? { pin: String(pin).trim() } : {})
-        }
-      },
-      { new: true }
-    );
+    const updated = await r2Db.updateAgent(id, req.body);
+    const newName = updated.name;
 
     // If agent name changed, update linked Customers and Leads
     if (oldName !== newName) {
-      await Customer.updateMany({ assignedTo: oldName }, { $set: { assignedTo: newName } });
-      await Lead.updateMany({ assignedAgent: oldName }, { $set: { assignedAgent: newName } });
+      const customers = await r2Db.getCustomers();
+      for (const cust of customers) {
+        if (cust.assignedTo === oldName) {
+          await r2Db.updateCustomer(cust.id, { assignedTo: newName });
+        }
+      }
+      const leads = await r2Db.getLeads();
+      for (const lead of leads) {
+        if (lead.assignedAgent === oldName) {
+          lead.assignedAgent = newName;
+          await r2Db.updateLeadStatus(lead.id, lead.status, lead.notes);
+        }
+      }
     }
 
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: updated, source: 'cloudflare-r2' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE agent strictly in MongoDB (returns assigned customers to pool)
+// DELETE agent strictly in Cloudflare R2 (returns assigned customers to pool)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const targetAgent = await Agent.findOne({ id: Number(id) });
+    const agents = await r2Db.getAgents();
+    const targetAgent = agents.find(a => Number(a.id) === Number(id));
+
     if (!targetAgent) {
       return res.status(404).json({ success: false, error: 'Agent not found' });
     }
 
     const agentName = targetAgent.name;
 
-    // Delete agent from MongoDB
-    await Agent.findOneAndDelete({ id: Number(id) });
+    // Delete agent from R2
+    await r2Db.deleteAgent(id);
 
     // Unassign customers and remove pipeline leads
-    await Customer.updateMany(
-      { assignedTo: agentName },
-      { $set: { isAssigned: false, assignedTo: null, assignedAt: null } }
-    );
+    const customers = await r2Db.getCustomers();
+    for (const cust of customers) {
+      if (cust.assignedTo === agentName) {
+        await r2Db.updateCustomer(cust.id, {
+          isAssigned: false,
+          assignedTo: null,
+          assignedAt: null
+        });
+      }
+    }
 
-    await Lead.deleteMany({ assignedAgent: agentName });
+    const leads = await r2Db.getLeads();
+    for (const lead of leads) {
+      if (lead.assignedAgent === agentName) {
+        await r2Db.deleteLead(lead.id);
+      }
+    }
 
     res.json({
       success: true,
-      message: `Agent ${agentName} removed from MongoDB. Assigned leads returned to unassigned pool.`
+      message: `Agent ${agentName} removed from Cloudflare R2. Assigned leads returned to unassigned pool.`,
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

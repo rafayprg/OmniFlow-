@@ -1,5 +1,5 @@
 import express from 'express';
-import { Admin } from '../models/Admin.js';
+import { r2Db } from '../services/r2DatabaseService.js';
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ const DEFAULT_ADMIN = {
   role: 'System Administrator'
 };
 
-// POST admin login verification against MongoDB
+// POST admin login verification against Cloudflare R2
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -22,10 +22,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter your Admin email and password.' });
     }
 
-    let admin = await Admin.findOne();
-    if (!admin) {
-      admin = await Admin.create(DEFAULT_ADMIN);
-    }
+    const admin = await r2Db.getAdmin();
 
     const matchesId = (admin.email && admin.email.toLowerCase() === cleanId) ||
                       (admin.username && admin.username.toLowerCase() === cleanId) ||
@@ -38,39 +35,38 @@ router.post('/login', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Admin authentication successful',
+      message: 'Admin authentication successful (Cloudflare R2)',
       data: {
-        id: admin._id,
+        id: 'admin-r2',
         email: admin.email,
         username: admin.username,
         name: admin.name,
         role: admin.role,
         avatar: admin.avatar
-      }
+      },
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// GET admin profile from MongoDB (Password omitted for security)
+// GET admin profile from Cloudflare R2 (Password omitted for security)
 router.get('/', async (req, res) => {
   try {
-    let admin = await Admin.findOne();
-    if (!admin) {
-      admin = await Admin.create(DEFAULT_ADMIN);
-    }
+    const admin = await r2Db.getAdmin();
 
     res.json({
       success: true,
       data: {
-        id: admin._id,
+        id: 'admin-r2',
         email: admin.email,
         username: admin.username,
         name: admin.name,
         role: admin.role,
         avatar: admin.avatar
-      }
+      },
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({
@@ -86,7 +82,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST update admin profile in MongoDB
+// POST update admin profile in Cloudflare R2
 router.post('/', async (req, res) => {
   try {
     const { name, email, username, password } = req.body;
@@ -98,16 +94,20 @@ router.post('/', async (req, res) => {
       ...(password ? { password: password.trim() } : {})
     };
 
-    let admin = await Admin.findOneAndUpdate(
-      {},
-      { $set: updateFields },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    const updated = await r2Db.updateAdmin(updateFields);
 
     res.json({
       success: true,
-      message: 'Admin profile updated successfully in MongoDB',
-      data: admin
+      message: 'Admin profile updated in Cloudflare R2',
+      data: {
+        id: 'admin-r2',
+        email: updated.email,
+        username: updated.username,
+        name: updated.name,
+        role: updated.role,
+        avatar: updated.avatar
+      },
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -1,80 +1,70 @@
-# Vercel Deployment Guide for OmniFlow CRM
+# Vercel Deployment Guide for OmniFlow CRM (Powered by Cloudflare R2)
 
-This project is configured and fully ready for **1-Click deployment on Vercel**.
+This CRM is completely shifted from MongoDB to **Cloudflare R2 Object Storage**. 
+It is 100% serverless, zero egress cost, and ready for **1-Click deployment on Vercel**.
 
 ---
 
-## Method 1: Deploy via GitHub (Recommended & Easiest)
+## 🔑 Step 1: Environment Variables for Vercel
 
-1. **Initialize Git & Push to GitHub:**
-   Open PowerShell or terminal in your project directory `c:\Users\DELL\Desktop\tean project` and run:
+When importing your project on Vercel (or under **Project Settings → Environment Variables**), add the following variables:
+
+| Variable Name | Value | Description |
+| :--- | :--- | :--- |
+| `R2_ACCOUNT_ID` | `93dec59d0fcf17e39d0e60adbe5af4a5` | Your Cloudflare Account ID |
+| `R2_ACCESS_KEY_ID` | `e514348cb8dbc69679c1f7a36f45a567` | Cloudflare R2 Access Key |
+| `R2_SECRET_ACCESS_KEY` | `e9fed1bebedc12a1cf72f9fb624d96fe446ff044ce570e3e98f395d18633545f` | Cloudflare R2 Secret Key |
+| `R2_BUCKET_NAME` | `musicapp` | Cloudflare R2 Bucket Name |
+| `R2_DATA_PREFIX` | `leadspro/` | Key prefix for CRM data collections |
+
+*(All your database collections `customers.json`, `leads.json`, `agents.json`, `admin.json`, and uploaded spreadsheets are synced directly inside your Cloudflare R2 bucket!)*
+
+---
+
+## 🚀 Method 1: Deploy via GitHub (Recommended)
+
+1. **Commit and Push to your GitHub:**
    ```bash
-   git init
    git add .
-   git commit -m "Complete Customer & Lead Management CRM"
+   git commit -m "Shift database and storage completely to Cloudflare R2"
+   git push
    ```
 
-2. **Create a GitHub Repository:**
-   - Go to [github.com](https://github.com) and click **"New repository"**.
-   - Copy the repository remote URL and run:
-   ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
-   git branch -M main
-   git push -u origin main
-   ```
-
-3. **Deploy on Vercel:**
-   - Go to [vercel.com](https://vercel.com) and log in (with GitHub).
+2. **Deploy on Vercel:**
+   - Go to [vercel.com](https://vercel.com) and log in.
    - Click **"Add New..."** → **"Project"**.
-   - Select your GitHub repository from the list.
-   - Vercel will automatically detect:
-     - **Framework Preset:** Vite
-     - **Build Command:** `npm run build`
-     - **Output Directory:** `dist`
+   - Select your GitHub repository.
+   - Expand the **Environment Variables** section and paste the R2 variables listed above.
    - Click **"Deploy"**!
-   - In ~30 seconds, your CRM will be live with a free SSL domain (e.g. `omniflow-crm.vercel.app`).
+   - In ~30 seconds, your CRM is live on your free Vercel domain (e.g. `leadspro.vercel.app`).
 
 ---
 
-## Method 2: Deploy Directly via Terminal (Using Vercel CLI)
+## 💻 Method 2: Deploy Directly via Terminal (Vercel CLI)
 
-If you don't want to use GitHub, you can deploy directly from your computer terminal:
+If you prefer to deploy directly from PowerShell without GitHub:
 
-1. In the terminal, run:
+1. Open PowerShell in `leadspro` directory:
+   ```bash
+   cd "c:\Users\user\Desktop\Leads Software\leadspro"
+   ```
+
+2. Run:
    ```bash
    npx vercel
    ```
-2. Follow the quick prompts:
-   - `Set up and deploy?` → Press **Y**
-   - `Which scope?` → Press **Enter** (your account)
-   - `Link to existing project?` → Press **N**
-   - `What's your project's name?` → Type `omniflow-crm` (or press **Enter**)
-   - `In which directory is your code located?` → Press **Enter** (`./`)
-   - `Want to modify settings?` → Press **N**
-3. Once the preview link is generated, deploy to production with:
+   Follow the prompts to connect your Vercel account.
+
+3. Deploy to Production with environment variables:
    ```bash
    npx vercel --prod
    ```
 
 ---
 
-## Included Vercel Configuration (`vercel.json`)
+## 🛠️ Architecture Highlights
 
-We have created [`vercel.json`](./vercel.json) in your project root:
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
-This ensures:
-- Vite builds the production bundle into `dist`.
-- Single-page application (SPA) routing routes cleanly to `index.html`.
-- No 404 errors on page refresh.
+- **Database Engine:** `server/services/r2DatabaseService.js` stores and queries collections in your Cloudflare R2 bucket.
+- **Serverless API:** `api/index.js` handles all `/api/*` endpoints on Vercel serverless functions with zero cold-start delay.
+- **Frontend SPA:** Built with React 19 + Vite + Tailwind CSS.
+- **Zero Cost & High Reliability:** No MongoDB Atlas connection dropouts or IP whitelist issues.

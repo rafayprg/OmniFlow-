@@ -1,24 +1,24 @@
 import express from 'express';
-import { Lead } from '../models/Lead.js';
+import { r2Db } from '../services/r2DatabaseService.js';
 
 const router = express.Router();
 
-// GET all leads strictly from MongoDB
+// GET all leads strictly from Cloudflare R2
 router.get('/', async (req, res) => {
   try {
-    const leads = await Lead.find().sort({ createdAt: -1 });
+    const leads = await r2Db.getLeads();
     res.json({
       success: true,
       count: leads.length,
       data: leads,
-      source: 'mongodb'
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// PUT update lead status strictly in MongoDB
+// PUT update lead status strictly in Cloudflare R2
 router.put('/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -29,50 +29,50 @@ router.put('/:id/status', async (req, res) => {
       return res.status(400).json({ success: false, error: `Invalid status: ${status}` });
     }
 
-    const now = new Date();
-    const timestamp = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-
-    const updateFields = {
-      status,
-      ...(status !== 'Pending' ? { lastContactDate: timestamp } : {}),
-      ...(notes ? { notes } : {})
-    };
-
-    const updated = await Lead.findOneAndUpdate(
-      { id },
-      { $set: updateFields },
-      { new: true }
-    );
+    const updated = await r2Db.updateLeadStatus(id, status, notes);
 
     if (!updated) {
-      return res.status(404).json({ success: false, error: 'Lead not found in MongoDB' });
+      return res.status(404).json({ success: false, error: 'Lead not found in Cloudflare R2' });
     }
 
-    res.json({ success: true, message: 'Status updated in MongoDB', data: updated });
+    res.json({
+      success: true,
+      message: 'Status updated in Cloudflare R2',
+      data: updated,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE single lead strictly from MongoDB
+// DELETE single lead strictly from Cloudflare R2
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await Lead.findOneAndDelete({ id });
+    const deleted = await r2Db.deleteLead(id);
     if (!deleted) {
       return res.status(404).json({ success: false, error: 'Lead not found' });
     }
-    res.json({ success: true, message: `Lead ${id} deleted from MongoDB` });
+    res.json({
+      success: true,
+      message: `Lead ${id} deleted from Cloudflare R2`,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE all leads strictly from MongoDB
+// DELETE all leads strictly from Cloudflare R2
 router.delete('/', async (req, res) => {
   try {
-    await Lead.deleteMany({});
-    res.json({ success: true, message: 'All leads deleted from MongoDB' });
+    await r2Db.clearAllLeads();
+    res.json({
+      success: true,
+      message: 'All leads deleted from Cloudflare R2',
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -83,18 +83,18 @@ router.put('/:id/category', async (req, res) => {
   try {
     const { id } = req.params;
     const { category } = req.body;
-    const newCategory = (category || 'General Business').trim();
+    const updated = await r2Db.updateLeadCategory(id, category);
 
-    const updated = await Lead.findOneAndUpdate(
-      { id },
-      { $set: { category: newCategory } },
-      { new: true }
-    );
     if (!updated) {
-      return res.status(404).json({ success: false, error: 'Lead not found in MongoDB' });
+      return res.status(404).json({ success: false, error: 'Lead not found in Cloudflare R2' });
     }
 
-    res.json({ success: true, message: 'Category updated in MongoDB', data: updated });
+    res.json({
+      success: true,
+      message: 'Category updated in Cloudflare R2',
+      data: updated,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

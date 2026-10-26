@@ -1,87 +1,66 @@
 import express from 'express';
-import { Customer } from '../models/Customer.js';
-import { Lead } from '../models/Lead.js';
+import { r2Db } from '../services/r2DatabaseService.js';
 
 const router = express.Router();
 
-// GET all customers strictly from MongoDB
+// GET all customers strictly from Cloudflare R2
 router.get('/', async (req, res) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
+    const customers = await r2Db.getCustomers();
     res.json({
       success: true,
       count: customers.length,
       data: customers,
-      source: 'mongodb'
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST single customer strictly to MongoDB
+// POST single customer strictly to Cloudflare R2
 router.post('/', async (req, res) => {
   try {
-    const { name, phone, email, source, city, category } = req.body;
-    const today = new Date().toISOString().split('T')[0];
-
-    const count = await Customer.countDocuments();
-    const id = `CUST-${1001 + count}`;
-
-    const newCustomer = await Customer.create({
-      id,
-      name: name ? name.trim() : 'Unnamed Account',
-      phone: phone ? phone.trim() : '0300-0000000',
-      email: email ? email.trim() : '',
-      source: source || 'Direct Entry',
-      category: category ? category.trim() : 'General Business',
-      city: city || 'Karachi',
-      importedDate: today,
-      isAssigned: false,
-      assignedTo: null,
-      assignedAt: null
-    });
-
-    res.status(201).json({ success: true, data: newCustomer });
+    const newCustomer = await r2Db.addCustomer(req.body);
+    res.status(201).json({ success: true, data: newCustomer, source: 'cloudflare-r2' });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
 });
 
-// POST bulk upload (from Excel) strictly to MongoDB
+// POST bulk upload (from Excel) strictly to Cloudflare R2
 router.post('/bulk', async (req, res) => {
   try {
-    const { records } = req.body;
+    const { records, fileBase64, fileName } = req.body;
     if (!Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ success: false, error: 'Records array is required' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
-    const currentCount = await Customer.countDocuments();
-    let nextNum = 1001 + currentCount;
+    // If raw file was sent, back it up to R2 uploads folder
+    let uploadedFileMeta = null;
+    if (fileBase64 && fileName) {
+      try {
+        const buffer = Buffer.from(fileBase64, 'base64');
+        uploadedFileMeta = await r2Db.uploadFile(fileName, buffer);
+      } catch (uploadErr) {
+        console.warn('Could not store raw excel file in R2 uploads:', uploadErr.message);
+      }
+    }
 
-    const toInsert = records.map(rec => ({
-      id: `CUST-${nextNum++}`,
-      name: rec.name ? rec.name.trim() : 'Unnamed Corporate Account',
-      phone: rec.phone ? rec.phone.trim() : '0300-0000000',
-      email: rec.email ? rec.email.trim() : '',
-      source: rec.source || 'Excel File Upload',
-      category: rec.category ? rec.category.trim() : 'General Business',
-      city: rec.city || 'Karachi',
-      importedDate: today,
-      isAssigned: false,
-      assignedTo: null,
-      assignedAt: null
-    }));
-
-    const inserted = await Customer.insertMany(toInsert);
-    res.status(201).json({ success: true, count: inserted.length, data: inserted });
+    const inserted = await r2Db.bulkAddCustomers(records);
+    res.status(201).json({
+      success: true,
+      count: inserted.length,
+      data: inserted,
+      fileUpload: uploadedFileMeta,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST assign customers to agent -> updates Customers and creates Leads in MongoDB
+// POST assign customers to agent -> updates Customers and creates Leads in Cloudflare R2
 router.post('/assign', async (req, res) => {
   try {
     const { customerIds, agentName } = req.body;
@@ -92,57 +71,21 @@ router.post('/assign', async (req, res) => {
       return res.status(400).json({ success: false, error: 'agentName is required' });
     }
 
-    const now = new Date();
-    const formattedDate = now.toISOString().split('T')[0];
-    const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // 1. Update Customers in MongoDB
-    await Customer.updateMany(
-      { id: { $in: customerIds } },
-      {
-        $set: {
-          isAssigned: true,
-          assignedTo: agentName,
-          assignedAt: `${formattedDate} ${formattedTime}`
-        }
-      }
-    );
-
-    // 2. Query updated customer records
-    const assignedCustomers = await Customer.find({ id: { $in: customerIds } });
-    const currentLeadCount = await Lead.countDocuments();
-    let leadNum = 2001 + currentLeadCount;
-
-    // 3. Create linked Leads in MongoDB with category preservation
-    const newLeads = assignedCustomers.map(cust => ({
-      id: `LEAD-${leadNum++}`,
-      customerId: cust.id,
-      name: cust.name,
-      phone: cust.phone,
-      email: cust.email,
-      source: cust.source,
-      category: cust.category || 'General Business',
-      assignedAgent: agentName,
-      status: 'Pending',
-      notes: `Assigned to ${agentName} on ${formattedDate}.`,
-      assignedDate: formattedDate,
-      lastContactDate: null
-    }));
-
-    const insertedLeads = await Lead.insertMany(newLeads);
+    const result = await r2Db.assignCustomersToAgent(customerIds, agentName);
 
     res.json({
       success: true,
-      message: `${customerIds.length} customer(s) assigned to ${agentName}`,
+      message: `${customerIds.length} customer(s) assigned to ${agentName} in Cloudflare R2`,
       count: customerIds.length,
-      leads: insertedLeads
+      result,
+      source: 'cloudflare-r2'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// POST unassign customers back to raw pool in MongoDB
+// POST unassign customers back to raw pool in Cloudflare R2
 router.post('/unassign', async (req, res) => {
   try {
     const { customerIds } = req.body;
@@ -150,37 +93,67 @@ router.post('/unassign', async (req, res) => {
       return res.status(400).json({ success: false, error: 'customerIds array required' });
     }
 
-    await Customer.updateMany(
-      { id: { $in: customerIds } },
-      { $set: { isAssigned: false, assignedTo: null, assignedAt: null } }
-    );
+    const idSet = new Set(customerIds);
+    for (const id of customerIds) {
+      await r2Db.updateCustomer(id, {
+        isAssigned: false,
+        assignedTo: null,
+        assignedAt: null
+      });
+    }
 
-    await Lead.deleteMany({ customerId: { $in: customerIds } });
+    // Delete linked leads
+    const leads = await r2Db.getLeads();
+    for (const lead of leads) {
+      if (idSet.has(lead.customerId)) {
+        await r2Db.deleteLead(lead.id);
+      }
+    }
 
-    res.json({ success: true, message: `${customerIds.length} customer(s) returned to pool` });
+    res.json({
+      success: true,
+      message: `${customerIds.length} customer(s) returned to pool in Cloudflare R2`,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE bulk customers (or delete all) strictly in MongoDB
+// DELETE bulk customers (or delete all) strictly in Cloudflare R2
 router.delete('/bulk', async (req, res) => {
   try {
     const { customerIds, all } = req.body;
 
     if (all) {
-      await Customer.deleteMany({});
-      await Lead.deleteMany({});
-      return res.json({ success: true, message: 'All customers and linked leads deleted from MongoDB' });
+      await r2Db.clearAllCustomers();
+      await r2Db.clearAllLeads();
+      return res.json({
+        success: true,
+        message: 'All customers and linked leads deleted from Cloudflare R2',
+        source: 'cloudflare-r2'
+      });
     }
 
     if (Array.isArray(customerIds) && customerIds.length > 0) {
-      await Customer.deleteMany({ id: { $in: customerIds } });
-      await Lead.deleteMany({ customerId: { $in: customerIds } });
-      return res.json({ success: true, message: 'Selected customers deleted from MongoDB' });
+      const idSet = new Set(customerIds);
+      for (const id of customerIds) {
+        await r2Db.deleteCustomer(id);
+      }
+      const leads = await r2Db.getLeads();
+      for (const lead of leads) {
+        if (idSet.has(lead.customerId)) {
+          await r2Db.deleteLead(lead.id);
+        }
+      }
+      return res.json({
+        success: true,
+        message: 'Selected customers deleted from Cloudflare R2',
+        source: 'cloudflare-r2'
+      });
     }
 
-    res.json({ success: true });
+    res.json({ success: true, source: 'cloudflare-r2' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -189,21 +162,34 @@ router.delete('/bulk', async (req, res) => {
 // DELETE all customers and leads
 router.delete('/all', async (req, res) => {
   try {
-    await Customer.deleteMany({});
-    await Lead.deleteMany({});
-    res.json({ success: true, message: 'All customers and linked leads cleared from MongoDB' });
+    await r2Db.clearAllCustomers();
+    await r2Db.clearAllLeads();
+    res.json({
+      success: true,
+      message: 'All customers and linked leads cleared from Cloudflare R2',
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// DELETE single customer strictly from MongoDB
+// DELETE single customer strictly from Cloudflare R2
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await Customer.findOneAndDelete({ id });
-    await Lead.deleteMany({ customerId: id });
-    res.json({ success: true, message: `Customer ${id} and linked leads deleted from MongoDB` });
+    await r2Db.deleteCustomer(id);
+    const leads = await r2Db.getLeads();
+    for (const lead of leads) {
+      if (lead.customerId === id) {
+        await r2Db.deleteLead(lead.id);
+      }
+    }
+    res.json({
+      success: true,
+      message: `Customer ${id} and linked leads deleted from Cloudflare R2`,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -216,22 +202,25 @@ router.put('/:id/category', async (req, res) => {
     const { category } = req.body;
     const newCategory = (category || 'General Business').trim();
 
-    const updated = await Customer.findOneAndUpdate(
-      { id },
-      { $set: { category: newCategory } },
-      { new: true }
-    );
+    const updated = await r2Db.updateCustomer(id, { category: newCategory });
     if (!updated) {
-      return res.status(404).json({ success: false, error: 'Customer not found' });
+      return res.status(404).json({ success: false, error: 'Customer not found in Cloudflare R2' });
     }
 
     // Also update any linked lead
-    await Lead.updateMany(
-      { customerId: id },
-      { $set: { category: newCategory } }
-    );
+    const leads = await r2Db.getLeads();
+    for (const lead of leads) {
+      if (lead.customerId === id) {
+        await r2Db.updateLeadCategory(lead.id, newCategory);
+      }
+    }
 
-    res.json({ success: true, message: 'Category updated in MongoDB', data: updated });
+    res.json({
+      success: true,
+      message: 'Category updated in Cloudflare R2',
+      data: updated,
+      source: 'cloudflare-r2'
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB } from './config/db.js';
+import { r2Db } from './services/r2DatabaseService.js';
+import { getR2Client, R2_BUCKET, R2_PREFIX } from './config/r2.js';
 
 import customerRoutes from './routes/customerRoutes.js';
 import leadRoutes from './routes/leadRoutes.js';
@@ -15,49 +16,46 @@ const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Middleware to ensure DB is connected for serverless calls
+// Middleware to ensure R2 Database Engine is initialized for serverless / local calls
 app.use(async (req, res, next) => {
   try {
-    await connectDB();
+    await r2Db.init();
   } catch (err) {
-    console.error('Database connection middleware error:', err.message);
+    console.error('R2 Database initialization error:', err.message);
   }
   next();
 });
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
-  let dbStatus = 'Disconnected';
-  let dbError = null;
-  const DEFAULT_URI = 'mongodb+srv://fareedalighulam_db_user:AF2JWmh5wQrr5EuL@cluster0.kbifor1.mongodb.net/leadspro?retryWrites=true&w=majority';
-  const isUriSet = Boolean(process.env.MONGODB_URI || DEFAULT_URI);
+  let r2Status = 'Disconnected';
+  let r2Error = null;
+  const isR2Configured = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
 
-  if (isUriSet) {
+  if (isR2Configured) {
     try {
-      await connectDB();
-      const state = (await import('mongoose')).default.connection.readyState;
-      if (state === 1) {
-        dbStatus = 'MongoDB Live Connected';
-      } else {
-        dbStatus = `MongoDB ReadyState: ${state}`;
-      }
+      await r2Db.init();
+      r2Status = 'Cloudflare R2 Live Connected';
     } catch (err) {
-      dbStatus = 'Connection Error';
-      dbError = err.message;
+      r2Status = 'Connection Error';
+      r2Error = err.message;
     }
   } else {
-    dbStatus = 'MONGODB_URI Missing';
+    r2Status = 'R2 Memory Storage (Local Fallback)';
   }
 
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    database: dbStatus,
-    dbError,
-    mongodbUriSet: isUriSet
+    database: r2Status,
+    storage: 'Cloudflare R2 Object Storage',
+    bucket: R2_BUCKET,
+    dataPrefix: R2_PREFIX,
+    r2Error,
+    r2Configured: isR2Configured
   });
 });
 
@@ -79,7 +77,13 @@ app.use('/admin', adminRoutes);
 
 // Root route for API verification
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'OmniFlow CRM API is running' });
+  res.json({
+    status: 'ok',
+    app: 'OmniFlow CRM / LeadsPro',
+    storageEngine: 'Cloudflare R2 Object Storage',
+    bucket: R2_BUCKET,
+    message: 'Backend is running live with Cloudflare R2'
+  });
 });
 
 // Global Error Handler
@@ -94,9 +98,10 @@ if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
   app.listen(PORT, async () => {
     console.log(`🚀 OmniFlow CRM Backend running on http://localhost:${PORT}`);
     try {
-      await connectDB();
+      await r2Db.init();
+      console.log(`☁️ Cloudflare R2 Connected: Bucket "${R2_BUCKET}" [Prefix: "${R2_PREFIX}"]`);
     } catch (e) {
-      console.log('💡 Note: Define MONGODB_URI in .env to connect to MongoDB Atlas.');
+      console.log('💡 Note: Check R2 credentials in .env.');
     }
   });
 }
