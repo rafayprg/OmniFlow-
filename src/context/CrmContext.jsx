@@ -11,7 +11,7 @@ export const DEFAULT_ADMIN = {
 const CrmContext = createContext(null);
 
 export const CrmProvider = ({ children }) => {
-  // Configured Admin Profile (populated directly from MongoDB)
+  // Configured Admin Profile (populated directly from Cloudflare R2)
   const [adminProfile, setAdminProfile] = useState(DEFAULT_ADMIN);
 
   // Authentication session (only auth token/session preserved in localStorage)
@@ -24,7 +24,7 @@ export const CrmProvider = ({ children }) => {
     }
   });
 
-  // Strict MongoDB Database States (ZERO dummy/mock data, ZERO localStorage fallback)
+  // Strict Cloudflare R2 Database States (ZERO dummy/mock data, ZERO localStorage fallback)
   const [customers, setCustomers] = useState([]);
   const [leads, setLeads] = useState([]);
   const [agents, setAgents] = useState([]);
@@ -35,7 +35,7 @@ export const CrmProvider = ({ children }) => {
   const [dbStatus, setDbStatus] = useState({
     connected: false,
     mode: 'connecting',
-    message: 'Connecting to MongoDB...'
+    message: 'Connecting to Cloudflare R2...'
   });
 
   // Persist only authentication session so refresh doesn't log the user out
@@ -64,7 +64,7 @@ export const CrmProvider = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  // Strict MongoDB Fetcher: Pulls fresh, real-time records from MongoDB collections
+  // Strict Cloudflare R2 Fetcher: Pulls fresh, real-time records from Cloudflare R2 collections
   const syncWithBackend = useCallback(async (isManual = false) => {
     try {
       const [custRes, leadRes, agentRes, adminRes, healthRes] = await Promise.all([
@@ -77,7 +77,7 @@ export const CrmProvider = ({ children }) => {
 
       let isConnected = false;
 
-      // 1. Customers strictly from MongoDB
+      // 1. Customers strictly from Cloudflare R2
       if (custRes && custRes.ok) {
         const cJson = await custRes.json();
         if (Array.isArray(cJson.data)) {
@@ -86,7 +86,7 @@ export const CrmProvider = ({ children }) => {
         }
       }
 
-      // 2. Leads strictly from MongoDB
+      // 2. Leads strictly from Cloudflare R2
       if (leadRes && leadRes.ok) {
         const lJson = await leadRes.json();
         if (Array.isArray(lJson.data)) {
@@ -95,7 +95,7 @@ export const CrmProvider = ({ children }) => {
         }
       }
 
-      // 3. Agents strictly from MongoDB
+      // 3. Agents strictly from Cloudflare R2
       if (agentRes && agentRes.ok) {
         const aJson = await agentRes.json();
         if (Array.isArray(aJson.data)) {
@@ -104,7 +104,7 @@ export const CrmProvider = ({ children }) => {
         }
       }
 
-      // 4. Admin Profile strictly from MongoDB
+      // 4. Admin Profile strictly from Cloudflare R2
       if (adminRes && adminRes.ok) {
         const adJson = await adminRes.json();
         if (adJson.data && (adJson.data.password || adJson.data.email)) {
@@ -119,33 +119,33 @@ export const CrmProvider = ({ children }) => {
 
       setDbStatus({
         connected: isConnected,
-        mode: isConnected ? 'mongodb' : 'disconnected',
+        mode: isConnected ? 'cloudflare-r2' : 'disconnected',
         message: isConnected 
-          ? (healthInfo?.database || 'MongoDB Live Database Connected') 
-          : 'Connecting to MongoDB...'
+          ? (healthInfo?.database || 'Cloudflare R2 Live Connected') 
+          : 'Connecting to Cloudflare R2...'
       });
 
       setIsLoading(false);
 
       if (isManual) {
         addToast({
-          title: 'MongoDB Synchronized',
-          message: 'All records, pipeline leads, and team profiles fetched live from MongoDB.',
+          title: 'Cloudflare R2 Synchronized',
+          message: 'All records, pipeline leads, and team profiles fetched live from Cloudflare R2.',
           type: 'success'
         });
       }
     } catch (err) {
-      console.warn('MongoDB sync error:', err);
+      console.warn('Cloudflare R2 sync error:', err);
       setDbStatus({
         connected: false,
         mode: 'error',
-        message: 'MongoDB Connection Error: ' + err.message
+        message: 'Cloudflare R2 Connection Error: ' + err.message
       });
       setIsLoading(false);
     }
   }, [addToast]);
 
-  // Live Auto-Sync: Poll MongoDB every 6 seconds + on window focus
+  // Live Auto-Sync: Poll Cloudflare R2 every 6 seconds + on window focus
   useEffect(() => {
     syncWithBackend();
 
@@ -165,7 +165,7 @@ export const CrmProvider = ({ children }) => {
     };
   }, [syncWithBackend]);
 
-  // 1. BULK UPLOAD CUSTOMERS strictly to MongoDB
+  // 1. BULK UPLOAD CUSTOMERS strictly to Cloudflare R2
   const bulkUploadCustomers = useCallback(async (newRecords, fileName = 'Imported_File.xlsx') => {
     try {
       const res = await fetch('/api/customers/bulk', {
@@ -175,34 +175,34 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to upload to MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to upload to Cloudflare R2 (Status: ${res.status})`);
       }
 
       const result = await res.json();
       const savedRecords = Array.isArray(result.data) ? result.data : [];
 
-      // Update state with records saved to MongoDB
+      // Update state with records saved to Cloudflare R2
       setCustomers(prev => [...savedRecords, ...prev]);
 
       addToast({
         title: 'Bulk Data Ingested',
-        message: `Successfully saved ${savedRecords.length} records to MongoDB from "${fileName}".`,
+        message: `Successfully saved ${savedRecords.length} records to Cloudflare R2 from "${fileName}".`,
         type: 'success'
       });
 
       return savedRecords;
     } catch (err) {
-      console.error('MongoDB bulk upload error:', err);
+      console.error('Cloudflare R2 bulk upload error:', err);
       addToast({
         title: 'Upload Failed',
-        message: 'Could not write to MongoDB: ' + err.message,
+        message: 'Could not write to Cloudflare R2: ' + err.message,
         type: 'error'
       });
       return [];
     }
   }, [addToast]);
 
-  // 2. ASSIGN CUSTOMERS TO AGENT strictly in MongoDB
+  // 2. ASSIGN CUSTOMERS TO AGENT strictly in Cloudflare R2
   const assignCustomersToAgent = useCallback(async (customerIds, agentName) => {
     if (!customerIds || customerIds.length === 0) {
       addToast({
@@ -230,15 +230,15 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to assign in MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to assign in Cloudflare R2 (Status: ${res.status})`);
       }
 
-      // Re-fetch fresh state from MongoDB
+      // Re-fetch fresh state from Cloudflare R2
       await syncWithBackend();
 
       addToast({
         title: 'Workflow Assignment Complete',
-        message: `${customerIds.length} customer(s) routed to ${agentName} in MongoDB pipeline.`,
+        message: `${customerIds.length} customer(s) routed to ${agentName} in Cloudflare R2 pipeline.`,
         type: 'success'
       });
 
@@ -247,14 +247,14 @@ export const CrmProvider = ({ children }) => {
       console.error('Assignment error:', err);
       addToast({
         title: 'Assignment Failed',
-        message: 'MongoDB update failed: ' + err.message,
+        message: 'Cloudflare R2 update failed: ' + err.message,
         type: 'error'
       });
       return false;
     }
   }, [syncWithBackend, addToast]);
 
-  // 3. STATUS TRACKING & UPDATING strictly in MongoDB
+  // 3. STATUS TRACKING & UPDATING strictly in Cloudflare R2
   const updateLeadStatus = useCallback(async (leadId, newStatus, note = '') => {
     let leadName = '';
 
@@ -283,25 +283,25 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`MongoDB status update failed (Status: ${res.status})`);
+        throw new Error(`Cloudflare R2 status update failed (Status: ${res.status})`);
       }
 
       addToast({
         title: 'Pipeline Status Updated',
-        message: `"${leadName}" marked as "${newStatus}" in MongoDB.`,
+        message: `"${leadName}" marked as "${newStatus}" in Cloudflare R2.`,
         type: newStatus === 'Interested' ? 'success' : newStatus === 'Not Interested' ? 'warning' : 'info'
       });
     } catch (err) {
       console.error('Lead status update error:', err);
       addToast({
         title: 'Update Error',
-        message: 'Could not update MongoDB: ' + err.message,
+        message: 'Could not update Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
   }, [addToast]);
 
-  // 3b. UPDATE LEAD CATEGORY strictly in MongoDB
+  // 3b. UPDATE LEAD CATEGORY strictly in Cloudflare R2
   const updateLeadCategory = useCallback(async (leadId, newCategory) => {
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, category: newCategory } : l));
     try {
@@ -321,7 +321,7 @@ export const CrmProvider = ({ children }) => {
     }
   }, [addToast]);
 
-  // 3c. UPDATE CUSTOMER CATEGORY strictly in MongoDB
+  // 3c. UPDATE CUSTOMER CATEGORY strictly in Cloudflare R2
   const updateCustomerCategory = useCallback(async (customerId, newCategory) => {
     setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, category: newCategory } : c));
     setLeads(prev => prev.map(l => l.customerId === customerId ? { ...l, category: newCategory } : l));
@@ -342,7 +342,7 @@ export const CrmProvider = ({ children }) => {
     }
   }, [addToast]);
 
-  // 4. ADD SINGLE CUSTOMER MANUALLY strictly to MongoDB
+  // 4. ADD SINGLE CUSTOMER MANUALLY strictly to Cloudflare R2
   const addSingleCustomer = useCallback(async (customerData) => {
     try {
       const res = await fetch('/api/customers', {
@@ -352,7 +352,7 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to save customer to MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to save customer to Cloudflare R2 (Status: ${res.status})`);
       }
 
       const result = await res.json();
@@ -362,7 +362,7 @@ export const CrmProvider = ({ children }) => {
 
       addToast({
         title: 'Customer Added',
-        message: `"${newCust.name}" persisted to MongoDB.`,
+        message: `"${newCust.name}" persisted to Cloudflare R2.`,
         type: 'success'
       });
 
@@ -371,14 +371,14 @@ export const CrmProvider = ({ children }) => {
       console.error('Add customer error:', err);
       addToast({
         title: 'Save Failed',
-        message: 'Could not write to MongoDB: ' + err.message,
+        message: 'Could not write to Cloudflare R2: ' + err.message,
         type: 'error'
       });
       return null;
     }
   }, [addToast]);
 
-  // 5. DELETE CUSTOMERS strictly in MongoDB
+  // 5. DELETE CUSTOMERS strictly in Cloudflare R2
   const deleteCustomers = useCallback(async (customerIds) => {
     if (!customerIds || customerIds.length === 0) return;
 
@@ -393,25 +393,25 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`MongoDB delete failed (Status: ${res.status})`);
+        throw new Error(`Cloudflare R2 delete failed (Status: ${res.status})`);
       }
 
       addToast({
         title: 'Deleted Successfully',
-        message: `Removed ${customerIds.length} customer record(s) from MongoDB.`,
+        message: `Removed ${customerIds.length} customer record(s) from Cloudflare R2.`,
         type: 'warning'
       });
     } catch (err) {
       console.error('Delete customers error:', err);
       addToast({
         title: 'Delete Failed',
-        message: 'Could not delete from MongoDB: ' + err.message,
+        message: 'Could not delete from Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
   }, [addToast]);
 
-  // 5b. DELETE ALL CUSTOMERS & LEADS strictly in MongoDB
+  // 5b. DELETE ALL CUSTOMERS & LEADS strictly in Cloudflare R2
   const deleteAllCustomers = useCallback(async () => {
     setCustomers([]);
     setLeads([]);
@@ -422,25 +422,25 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`MongoDB clear failed (Status: ${res.status})`);
+        throw new Error(`Cloudflare R2 clear failed (Status: ${res.status})`);
       }
 
       addToast({
         title: 'Database Wiped',
-        message: 'All customer records and linked pipeline leads cleared from MongoDB.',
+        message: 'All customer records and linked pipeline leads cleared from Cloudflare R2.',
         type: 'warning'
       });
     } catch (err) {
       console.error('Wipe error:', err);
       addToast({
         title: 'Wipe Failed',
-        message: 'Could not wipe MongoDB: ' + err.message,
+        message: 'Could not wipe Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
   }, [addToast]);
 
-  // 6. UNASSIGN CUSTOMERS strictly in MongoDB
+  // 6. UNASSIGN CUSTOMERS strictly in Cloudflare R2
   const unassignCustomers = useCallback(async (customerIds) => {
     if (!customerIds || customerIds.length === 0) return;
 
@@ -466,25 +466,25 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`MongoDB unassign failed (Status: ${res.status})`);
+        throw new Error(`Cloudflare R2 unassign failed (Status: ${res.status})`);
       }
 
       addToast({
         title: 'Assignment Reverted',
-        message: `${customerIds.length} customer(s) returned to Unassigned Pool in MongoDB.`,
+        message: `${customerIds.length} customer(s) returned to Unassigned Pool in Cloudflare R2.`,
         type: 'info'
       });
     } catch (err) {
       console.error('Unassign error:', err);
       addToast({
         title: 'Unassign Failed',
-        message: 'MongoDB update failed: ' + err.message,
+        message: 'Cloudflare R2 update failed: ' + err.message,
         type: 'error'
       });
     }
   }, [addToast]);
 
-  // 7. DELETE SINGLE LEAD strictly in MongoDB
+  // 7. DELETE SINGLE LEAD strictly in Cloudflare R2
   const deleteLead = useCallback(async (leadId) => {
     setLeads(prev => prev.filter(l => l.id !== leadId));
 
@@ -494,25 +494,25 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`MongoDB lead delete failed (Status: ${res.status})`);
+        throw new Error(`Cloudflare R2 lead delete failed (Status: ${res.status})`);
       }
 
       addToast({
         title: 'Lead Removed',
-        message: 'Lead removed from active pipeline in MongoDB.',
+        message: 'Lead removed from active pipeline in Cloudflare R2.',
         type: 'warning'
       });
     } catch (err) {
       console.error('Lead delete error:', err);
       addToast({
         title: 'Delete Failed',
-        message: 'Could not delete from MongoDB: ' + err.message,
+        message: 'Could not delete from Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
   }, [addToast]);
 
-  // 8. ADD NEW TEAM MEMBER strictly to MongoDB
+  // 8. ADD NEW TEAM MEMBER strictly to Cloudflare R2
   const addAgent = useCallback(async (agentData) => {
     if (!agentData.name?.trim()) {
       addToast({
@@ -531,7 +531,7 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to create agent in MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to create agent in Cloudflare R2 (Status: ${res.status})`);
       }
 
       const result = await res.json();
@@ -541,7 +541,7 @@ export const CrmProvider = ({ children }) => {
 
       addToast({
         title: 'Team Member Added',
-        message: `${newAgent.name} (PIN: ${newAgent.pin}) persisted to MongoDB.`,
+        message: `${newAgent.name} (PIN: ${newAgent.pin}) persisted to Cloudflare R2.`,
         type: 'success'
       });
 
@@ -550,14 +550,14 @@ export const CrmProvider = ({ children }) => {
       console.error('Add agent error:', err);
       addToast({
         title: 'Creation Failed',
-        message: 'Could not write to MongoDB: ' + err.message,
+        message: 'Could not write to Cloudflare R2: ' + err.message,
         type: 'error'
       });
       return null;
     }
   }, [addToast]);
 
-  // 9. UPDATE TEAM MEMBER strictly in MongoDB
+  // 9. UPDATE TEAM MEMBER strictly in Cloudflare R2
   const updateAgent = useCallback(async (agentId, updatedData) => {
     try {
       const res = await fetch(`/api/agents/${agentId}`, {
@@ -567,7 +567,7 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to update agent in MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to update agent in Cloudflare R2 (Status: ${res.status})`);
       }
 
       // Re-fetch all to ensure relational updates (name changes in customer/leads) are fresh
@@ -575,20 +575,20 @@ export const CrmProvider = ({ children }) => {
 
       addToast({
         title: 'Team Member Updated',
-        message: 'Profile details saved to MongoDB.',
+        message: 'Profile details saved to Cloudflare R2.',
         type: 'success'
       });
     } catch (err) {
       console.error('Update agent error:', err);
       addToast({
         title: 'Update Failed',
-        message: 'MongoDB update failed: ' + err.message,
+        message: 'Cloudflare R2 update failed: ' + err.message,
         type: 'error'
       });
     }
   }, [syncWithBackend, addToast]);
 
-  // 9b. UPDATE AGENT PIN strictly in MongoDB
+  // 9b. UPDATE AGENT PIN strictly in Cloudflare R2
   const updateAgentPin = useCallback(async (agentId, newPin) => {
     const pinStr = String(newPin).trim();
     if (!pinStr) {
@@ -619,12 +619,12 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to assign PIN in MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to assign PIN in Cloudflare R2 (Status: ${res.status})`);
       }
 
       addToast({
         title: 'PIN Assigned',
-        message: `New security PIN "${pinStr}" assigned to ${agentName} in MongoDB.`,
+        message: `New security PIN "${pinStr}" assigned to ${agentName} in Cloudflare R2.`,
         type: 'success'
       });
       return true;
@@ -632,14 +632,14 @@ export const CrmProvider = ({ children }) => {
       console.error('PIN update error:', err);
       addToast({
         title: 'PIN Update Failed',
-        message: 'MongoDB PIN update failed: ' + err.message,
+        message: 'Cloudflare R2 PIN update failed: ' + err.message,
         type: 'error'
       });
       return false;
     }
   }, [addToast]);
 
-  // 10. REMOVE TEAM MEMBER strictly from MongoDB
+  // 10. REMOVE TEAM MEMBER strictly from Cloudflare R2
   const removeAgent = useCallback(async (agentId) => {
     const targetAgent = agents.find(a => a.id === agentId);
     if (!targetAgent) return;
@@ -652,27 +652,27 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to delete agent from MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to delete agent from Cloudflare R2 (Status: ${res.status})`);
       }
 
       await syncWithBackend();
 
       addToast({
         title: 'Member Removed from Team',
-        message: `${agentName} removed from MongoDB. Assigned leads returned to unassigned pool.`,
+        message: `${agentName} removed from Cloudflare R2. Assigned leads returned to unassigned pool.`,
         type: 'warning'
       });
     } catch (err) {
       console.error('Delete agent error:', err);
       addToast({
         title: 'Removal Failed',
-        message: 'Could not delete from MongoDB: ' + err.message,
+        message: 'Could not delete from Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
   }, [agents, syncWithBackend, addToast]);
 
-  // 11. UPDATE ADMIN PROFILE strictly in MongoDB
+  // 11. UPDATE ADMIN PROFILE strictly in Cloudflare R2
   const updateAdminProfile = useCallback(async (updates) => {
     try {
       const res = await fetch('/api/admin', {
@@ -682,7 +682,7 @@ export const CrmProvider = ({ children }) => {
       });
 
       if (!res.ok) {
-        throw new Error(`Failed to update admin profile in MongoDB (Status: ${res.status})`);
+        throw new Error(`Failed to update admin profile in Cloudflare R2 (Status: ${res.status})`);
       }
 
       const result = await res.json();
@@ -702,14 +702,14 @@ export const CrmProvider = ({ children }) => {
 
       addToast({
         title: 'Admin Profile Updated',
-        message: 'Administrator details saved in MongoDB database.',
+        message: 'Administrator details saved in Cloudflare R2 database.',
         type: 'success'
       });
     } catch (err) {
       console.error('Admin profile error:', err);
       addToast({
         title: 'Profile Update Failed',
-        message: 'Could not save to MongoDB: ' + err.message,
+        message: 'Could not save to Cloudflare R2: ' + err.message,
         type: 'error'
       });
     }
@@ -727,7 +727,7 @@ export const CrmProvider = ({ children }) => {
       return { success: false, message: msg };
     }
 
-    // Authenticate securely against MongoDB backend
+    // Authenticate securely against Cloudflare R2 backend
     try {
       const res = await fetch('/api/admin/login', {
         method: 'POST',
@@ -846,7 +846,7 @@ export const CrmProvider = ({ children }) => {
     });
   }, [addToast]);
 
-  // 13. COMPUTED DASHBOARD & ANALYTICS METRICS (Directly from live MongoDB collections)
+  // 13. COMPUTED DASHBOARD & ANALYTICS METRICS (Directly from live Cloudflare R2 collections)
   const analytics = useMemo(() => {
     const totalCustomersPool = customers.length;
     const totalLeadsAssigned = leads.length;

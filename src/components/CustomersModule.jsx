@@ -178,7 +178,7 @@ export const CustomersModule = ({ onOpenUpload, searchQuery, setSearchQuery }) =
       targetIds: [],
       isWipeAll: true,
       title: `Delete ALL ${customers.length} Customer Records?`,
-      message: `This will permanently delete all ${customers.length} customer records and any active leads from MongoDB Atlas database and local cache. You can re-upload fresh Excel sheets anytime.`,
+      message: `This will permanently delete all ${customers.length} customer records and any active leads from Cloudflare R2 bucket and local cache. You can re-upload fresh Excel sheets anytime.`,
       assignedCount: analytics.assignedCustomersCount
     });
   };
@@ -528,7 +528,7 @@ export const CustomersModule = ({ onOpenUpload, searchQuery, setSearchQuery }) =
             <button
               onClick={handlePromptDeleteAll}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors cursor-pointer"
-              title="Permanently wipe all customer records and linked leads from MongoDB database"
+              title="Permanently wipe all customer records and linked leads from Cloudflare R2 database"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-600" />
               <span>Delete All Records ({customers.length})</span>

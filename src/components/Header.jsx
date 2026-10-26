@@ -67,16 +67,16 @@ export const Header = ({ onOpenUpload, searchQuery, setSearchQuery, onToggleMobi
         >
           <span className={`w-2 h-2 rounded-full ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-400'}`} />
           <span className="text-[11px] font-bold hidden sm:inline">
-            {dbStatus?.connected ? 'MongoDB Live' : 'Connecting...'}
+            {dbStatus?.connected ? 'Cloudflare R2 Live' : 'Connecting...'}
           </span>
         </div>
 
-        {/* Sync MongoDB Button */}
+        {/* Sync R2 Button */}
         <button
           type="button"
           onClick={() => syncNow()}
           className="flex items-center gap-1.5 p-2 sm:px-3 sm:py-1.5 bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 border border-slate-200 hover:border-emerald-300 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
-          title="Instantly synchronize records from MongoDB"
+          title="Instantly synchronize records from Cloudflare R2"
         >
           <RefreshCw className="w-3.5 h-3.5 text-emerald-600" />
           <span className="hidden md:inline">Sync</span>

@@ -592,7 +592,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery }) => {
                         onClick={() => handleSaveNote(lead.id, lead.status)}
                         className="w-full py-1.5 bg-blue-600 text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
                       >
-                        Save Note to MongoDB
+                        Save Note to R2
                       </button>
                     </div>
                   ) : (

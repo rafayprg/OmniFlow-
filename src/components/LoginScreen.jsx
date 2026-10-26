@@ -135,16 +135,16 @@ export const LoginScreen = () => {
             type="button"
             onClick={() => syncNow()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/80 text-xs text-blue-300 transition-all cursor-pointer"
-            title="Fetch Latest Data from MongoDB"
+            title="Fetch Latest Data from Cloudflare R2"
           >
             <RefreshCw className="w-3.5 h-3.5 text-blue-400" />
-            <span className="text-[11px] font-semibold">Sync DB</span>
+            <span className="text-[11px] font-semibold">Sync R2</span>
           </button>
 
           <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/80 text-xs">
             <span className={`w-2 h-2 rounded-full ${dbStatus?.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className="text-slate-300 text-[11px] font-semibold">
-              {dbStatus?.connected ? 'MongoDB Live' : 'Connecting to DB...'}
+              {dbStatus?.connected ? 'Cloudflare R2 Live' : 'Connecting to R2...'}
             </span>
           </div>
         </div>
