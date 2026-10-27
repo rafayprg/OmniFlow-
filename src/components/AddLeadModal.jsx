@@ -15,12 +15,9 @@ import {
   AlertCircle,
   Loader2,
   Globe,
-  Instagram,
-  Linkedin,
-  Youtube,
   Share2
 } from 'lucide-react';
-import { TikTokIcon } from '../utils/socialUtils';
+import { TikTokIcon, InstagramIcon, LinkedInIcon, YouTubeIcon } from '../utils/socialUtils';
 
 const PAKISTANI_CITIES = [
   'Karachi',
@@ -373,7 +370,7 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
               {/* Instagram */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                  <Instagram className="w-3 h-3 text-pink-600" />
+                  <InstagramIcon className="w-3 h-3 text-pink-600" />
                   <span>Instagram</span>
                 </label>
                 <div className="relative">
@@ -424,7 +421,7 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
               {/* LinkedIn */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                  <Linkedin className="w-3 h-3 text-sky-600" />
+                  <LinkedInIcon className="w-3 h-3 text-sky-600" />
                   <span>LinkedIn</span>
                 </label>
                 <input
@@ -439,7 +436,7 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
               {/* YouTube */}
               <div className="sm:col-span-2">
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
-                  <Youtube className="w-3 h-3 text-rose-600" />
+                  <YouTubeIcon className="w-3 h-3 text-rose-600" />
                   <span>YouTube Channel</span>
                 </label>
                 <input

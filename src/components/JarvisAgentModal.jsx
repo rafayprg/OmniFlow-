@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCrm } from '../context/CrmContext';
 import { BUSINESS_CATEGORIES } from '../utils/categoryUtils';
-import { TikTokIcon, formatSocialUrl } from '../utils/socialUtils';
+import { TikTokIcon, InstagramIcon, LinkedInIcon, YouTubeIcon, formatSocialUrl } from '../utils/socialUtils';
 import { 
   X, 
   Bot, 
@@ -18,9 +18,6 @@ import {
   MapPin, 
   Briefcase, 
   Globe, 
-  Instagram, 
-  Linkedin, 
-  Youtube, 
   UserCheck, 
   RefreshCw,
   Wand2,
@@ -602,7 +599,7 @@ export const JarvisAgentModal = ({ isOpen, onClose }) => {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {/* Instagram */}
                     <div className="relative">
-                      <Instagram className="w-3 h-3 text-pink-400 absolute left-2 top-2" />
+                      <InstagramIcon className="w-3 h-3 text-pink-400 absolute left-2 top-2" />
                       <input
                         type="text"
                         placeholder="Instagram"
@@ -638,7 +635,7 @@ export const JarvisAgentModal = ({ isOpen, onClose }) => {
 
                     {/* LinkedIn */}
                     <div className="relative">
-                      <Linkedin className="w-3 h-3 text-sky-400 absolute left-2 top-2" />
+                      <LinkedInIcon className="w-3 h-3 text-sky-400 absolute left-2 top-2" />
                       <input
                         type="text"
                         placeholder="LinkedIn"
@@ -650,7 +647,7 @@ export const JarvisAgentModal = ({ isOpen, onClose }) => {
 
                     {/* YouTube */}
                     <div className="relative">
-                      <Youtube className="w-3 h-3 text-rose-400 absolute left-2 top-2" />
+                      <YouTubeIcon className="w-3 h-3 text-rose-400 absolute left-2 top-2" />
                       <input
                         type="text"
                         placeholder="YouTube"
