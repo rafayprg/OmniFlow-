@@ -4,6 +4,7 @@ import { useCrm } from '../context/CrmContext';
 import { StatusBadge, SourceBadge } from './StatusBadge';
 import { formatWhatsAppUrl, formatTelUrl, WhatsAppIcon } from '../utils/phoneUtils';
 import { BUSINESS_CATEGORIES, getCategoryConfig, CategoryBadge } from '../utils/categoryUtils';
+import { SocialLinksBadges } from '../utils/socialUtils';
 import { 
   PhoneForwarded, 
   Phone, 
@@ -176,6 +177,11 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
       "Calling Timings": getCategoryConfig(l.category).timings,
       "Phone Number": l.phone,
       "Email Address": l.email,
+      "Website": l.website || '',
+      "Instagram": l.instagram || '',
+      "TikTok": l.tiktok || '',
+      "LinkedIn": l.linkedin || '',
+      "YouTube": l.youtube || '',
       "Assigned Agent": l.assignedAgent,
       "Pipeline Status": l.status,
       "Source Origin": l.source,
@@ -445,6 +451,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                           {lead.email}
                         </p>
                       )}
+                      <SocialLinksBadges lead={lead} />
                     </div>
 
                     <SourceBadge source={lead.source} />
@@ -716,6 +723,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                           <p className="text-[11px] text-slate-400 truncate max-w-xs">
                             {lead.email || 'No email registered'}
                           </p>
+                          <SocialLinksBadges lead={lead} />
                         </div>
                       </td>
 

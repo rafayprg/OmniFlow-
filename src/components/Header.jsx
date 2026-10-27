@@ -7,10 +7,12 @@ import {
   Menu,
   ShieldCheck,
   X,
-  UserPlus
+  UserPlus,
+  Bot,
+  Sparkles
 } from 'lucide-react';
 
-export const Header = ({ onOpenUpload, onOpenAddLead, searchQuery, setSearchQuery, onToggleMobileMenu }) => {
+export const Header = ({ onOpenUpload, onOpenAddLead, onOpenJarvis, searchQuery, setSearchQuery, onToggleMobileMenu }) => {
   const { customers, leads, dbStatus, auth, adminProfile, updateAdminProfile, syncNow } = useCrm();
 
   // Admin Profile Edit Modal State
@@ -104,6 +106,18 @@ export const Header = ({ onOpenUpload, onOpenAddLead, searchQuery, setSearchQuer
           >
             <UserPlus className="w-3.5 h-3.5 text-white" />
             <span className="hidden sm:inline">+ Lead</span>
+          </button>
+        )}
+
+        {/* JARVIS AI Lead Assistant Button */}
+        {onOpenJarvis && (
+          <button
+            onClick={onOpenJarvis}
+            className="p-2 sm:px-3 sm:py-1.5 bg-gradient-to-r from-slate-900 to-cyan-950 text-cyan-300 hover:text-white border border-cyan-500/40 hover:border-cyan-400 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-500/20 cursor-pointer active:scale-95"
+            title="Launch JARVIS AI Natural Language Lead Assistant"
+          >
+            <Bot className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+            <span className="hidden sm:inline">JARVIS AI</span>
           </button>
         )}
 

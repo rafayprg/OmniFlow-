@@ -8,14 +8,16 @@ import { DashboardModule } from './components/DashboardModule';
 import { TeamModule } from './components/TeamModule';
 import { BulkUploadModal } from './components/BulkUploadModal';
 import { AddLeadModal } from './components/AddLeadModal';
+import { JarvisAgentModal } from './components/JarvisAgentModal';
 import { ToastContainer } from './components/ToastContainer';
 import { LoginScreen } from './components/LoginScreen';
-import { LayoutDashboard, Database, PhoneForwarded, Users2, LogOut } from 'lucide-react';
+import { LayoutDashboard, Database, PhoneForwarded, Users2, LogOut, Cpu, Sparkles } from 'lucide-react';
 
 const MainLayout = () => {
   const { activeTab, setActiveTab, auth, logout, leads } = useCrm();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+  const [isJarvisOpen, setIsJarvisOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -54,6 +56,7 @@ const MainLayout = () => {
         <Header 
           onOpenUpload={handleOpenUpload}
           onOpenAddLead={() => setIsAddLeadOpen(true)}
+          onOpenJarvis={() => setIsJarvisOpen(true)}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
@@ -180,6 +183,31 @@ const MainLayout = () => {
         isOpen={isAddLeadOpen}
         onClose={() => setIsAddLeadOpen(false)}
       />
+
+      {/* JARVIS Autonomous AI Lead Agent Modal */}
+      <JarvisAgentModal
+        isOpen={isJarvisOpen}
+        onClose={() => setIsJarvisOpen(false)}
+      />
+
+      {/* Floating JARVIS AI Agent Button (Always visible on screen) */}
+      <button
+        onClick={() => setIsJarvisOpen(true)}
+        className="fixed bottom-20 md:bottom-6 right-4 md:right-8 z-40 group flex items-center gap-2.5 px-3.5 py-2.5 bg-slate-950/90 hover:bg-slate-900 text-cyan-300 border border-cyan-400/50 rounded-full shadow-2xl shadow-cyan-500/25 backdrop-blur-md transition-all transform hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-cyan-400/20"
+        title="Open JARVIS AI Lead Agent"
+      >
+        <div className="relative flex items-center justify-center w-7 h-7 rounded-full bg-cyan-500/20 border border-cyan-400/60 shadow-inner">
+          <Cpu className="w-4 h-4 text-cyan-400 group-hover:rotate-180 transition-transform duration-700" />
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+        </div>
+        <div className="flex flex-col text-left">
+          <span className="text-[11px] font-mono font-extrabold tracking-wider text-cyan-300 flex items-center gap-1">
+            <span>JARVIS AI</span>
+            <Sparkles className="w-3 h-3 text-cyan-400" />
+          </span>
+          <span className="text-[9px] text-slate-400 font-sans -mt-0.5 hidden sm:inline">Auto Lead Agent</span>
+        </div>
+      </button>
 
       {/* Toast Alerts */}
       <ToastContainer />

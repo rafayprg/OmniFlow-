@@ -13,8 +13,14 @@ import {
   FileText, 
   CheckCircle2, 
   AlertCircle,
-  Loader2
+  Loader2,
+  Globe,
+  Instagram,
+  Linkedin,
+  Youtube,
+  Share2
 } from 'lucide-react';
+import { TikTokIcon } from '../utils/socialUtils';
 
 const PAKISTANI_CITIES = [
   'Karachi',
@@ -46,6 +52,11 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
     customCity: '',
     assignedAgent: defaultAgent,
     status: 'Pending',
+    website: '',
+    instagram: '',
+    tiktok: '',
+    linkedin: '',
+    youtube: '',
     notes: ''
   });
 
@@ -64,6 +75,11 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
         customCity: '',
         assignedAgent: isAgent ? auth?.name : (agents[0]?.name || 'Admin'),
         status: 'Pending',
+        website: '',
+        instagram: '',
+        tiktok: '',
+        linkedin: '',
+        youtube: '',
         notes: ''
       });
       setErrorMessage('');
@@ -117,6 +133,11 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
       city: resolvedCity,
       assignedAgent: isAgent ? auth.name : formData.assignedAgent,
       status: formData.status,
+      website: formData.website.trim(),
+      instagram: formData.instagram.trim(),
+      tiktok: formData.tiktok.trim(),
+      linkedin: formData.linkedin.trim(),
+      youtube: formData.youtube.trim(),
       notes: formData.notes.trim() || `Lead directly entered by ${auth?.name || 'team member'}.`,
       source: 'Direct Team Entry'
     };
@@ -340,7 +361,99 @@ export const AddLeadModal = ({ isOpen, onClose }) => {
             )}
           </div>
 
-          {/* 5. Notes / Details */}
+          {/* 5. SOCIAL MEDIA & WEB PRESENCE */}
+          <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <Share2 className="w-3.5 h-3.5 text-blue-600" />
+              <span>Social Media & Web Links</span>
+              <span className="text-[10px] text-slate-400 font-normal ml-auto">(Optional - handles or URLs)</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Instagram */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <Instagram className="w-3 h-3 text-pink-600" />
+                  <span>Instagram</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">@</span>
+                  <input
+                    type="text"
+                    placeholder="username or link"
+                    value={formData.instagram}
+                    onChange={(e) => handleChange('instagram', e.target.value)}
+                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:border-pink-500 transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* TikTok */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <TikTokIcon className="w-3 h-3 text-slate-900" />
+                  <span>TikTok</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">@</span>
+                  <input
+                    type="text"
+                    placeholder="username or link"
+                    value={formData.tiktok}
+                    onChange={(e) => handleChange('tiktok', e.target.value)}
+                    className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800/20 focus:border-slate-800 transition-all font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Website */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <Globe className="w-3 h-3 text-blue-600" />
+                  <span>Website</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="www.example.com"
+                  value={formData.website}
+                  onChange={(e) => handleChange('website', e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                />
+              </div>
+
+              {/* LinkedIn */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <Linkedin className="w-3 h-3 text-sky-600" />
+                  <span>LinkedIn</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="profile or company link"
+                  value={formData.linkedin}
+                  onChange={(e) => handleChange('linkedin', e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-600 transition-all font-mono"
+                />
+              </div>
+
+              {/* YouTube */}
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                  <Youtube className="w-3 h-3 text-rose-600" />
+                  <span>YouTube Channel</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="@channel or channel URL"
+                  value={formData.youtube}
+                  onChange={(e) => handleChange('youtube', e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-600 transition-all font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 6. Notes / Details */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Remarks / Initial Discussion Notes
