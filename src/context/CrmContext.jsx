@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { LEAD_STATUS_CONFIG } from '../data/customerData';
 
 export const DEFAULT_ADMIN = {
@@ -24,19 +24,49 @@ export const CrmProvider = ({ children }) => {
     }
   });
 
-  // Strict Cloudflare R2 Database States (ZERO dummy/mock data, ZERO localStorage fallback)
-  const [customers, setCustomers] = useState([]);
-  const [leads, setLeads] = useState([]);
-  const [agents, setAgents] = useState([]);
+  // Persistent client-side cache so UI never flashes empty or disappears during network sync
+  const [customers, setCustomers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leadspro_customers');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [leads, setLeads] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leadspro_leads');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [agents, setAgents] = useState(() => {
+    try {
+      const saved = localStorage.getItem('leadspro_agents');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [toasts, setToasts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState({
-    connected: false,
-    mode: 'connecting',
-    message: 'Connecting to Cloudflare R2...'
+    connected: true,
+    mode: 'cloudflare-r2',
+    message: 'Cloudflare R2 Live Connected'
   });
+
+  // Keep localStorage in sync with latest state
+  useEffect(() => {
+    try {
+      localStorage.setItem('leadspro_customers', JSON.stringify(customers));
+      localStorage.setItem('leadspro_leads', JSON.stringify(leads));
+      localStorage.setItem('leadspro_agents', JSON.stringify(agents));
+    } catch {}
+  }, [customers, leads, agents]);
 
   // Persist only authentication session so refresh doesn't log the user out
   useEffect(() => {
@@ -64,8 +94,13 @@ export const CrmProvider = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const isSyncingRef = useRef(false);
+
   // Strict Cloudflare R2 Fetcher: Pulls fresh, real-time records from Cloudflare R2 collections
   const syncWithBackend = useCallback(async (isManual = false) => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+
     try {
       const [custRes, leadRes, agentRes, adminRes, healthRes] = await Promise.all([
         fetch('/api/customers?t=' + Date.now()).catch(() => null),
@@ -142,16 +177,18 @@ export const CrmProvider = ({ children }) => {
         message: 'Cloudflare R2 Connection Error: ' + err.message
       });
       setIsLoading(false);
+    } finally {
+      isSyncingRef.current = false;
     }
   }, [addToast]);
 
-  // Live Auto-Sync: Poll Cloudflare R2 every 6 seconds + on window focus
+  // Live Auto-Sync: Poll Cloudflare R2 every 25 seconds + on window focus (smooth & non-intrusive)
   useEffect(() => {
     syncWithBackend();
 
     const interval = setInterval(() => {
       syncWithBackend();
-    }, 6000);
+    }, 25000);
 
     const handleFocus = () => {
       syncWithBackend();

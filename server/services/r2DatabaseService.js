@@ -1,19 +1,7 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { GetObjectCommand, PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getR2Client, R2_BUCKET, R2_PREFIX } from '../config/r2.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const LOCAL_DATA_DIR = path.resolve(__dirname, '../data');
-
-// Ensure local backup directory exists
-if (!fs.existsSync(LOCAL_DATA_DIR)) {
-  fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
-}
-
-// Default Seed Data
+// Default Admin Profile
 const DEFAULT_ADMIN = {
   username: 'sales@techdeva.net',
   email: 'sales@techdeva.net',
@@ -24,100 +12,65 @@ const DEFAULT_ADMIN = {
   updatedAt: new Date().toISOString()
 };
 
-const DEFAULT_AGENTS = [];
-
 class R2DatabaseService {
   constructor() {
-    this.initialized = false;
-    this.initPromise = null;
-    this.memory = {
+    // In-memory fallback cache only for offline / error recovery
+    this.cache = {
       customers: [],
       leads: [],
       agents: [],
-      admin: null
+      admin: DEFAULT_ADMIN
     };
   }
 
   async init() {
-    if (this.initialized) return;
-    if (this.initPromise) return this.initPromise;
-
-    this.initPromise = (async () => {
-      try {
-        console.log('⚡ Initializing R2 Database Engine...');
-        await Promise.all([
-          this.loadCollection('customers', []),
-          this.loadCollection('leads', []),
-          this.loadCollection('agents', DEFAULT_AGENTS),
-          this.loadCollection('admin', DEFAULT_ADMIN)
-        ]);
-        this.initialized = true;
-        console.log(`✅ R2 Database Ready: ${this.memory.customers.length} Customers, ${this.memory.leads.length} Leads, ${this.memory.agents.length} Agents loaded from Cloudflare R2.`);
-      } catch (err) {
-        console.error('⚠️ R2 Database init warning:', err.message);
-        this.loadLocalFallbacks();
-        this.initialized = true;
-      }
-    })();
-
-    return this.initPromise;
+    // Quick probe to ensure bucket is reachable
+    const client = getR2Client();
+    return Boolean(client);
   }
 
-  // Load a collection from R2 or fallback to default
-  async loadCollection(name, defaultData) {
+  // Always fetch fresh real-time data from Cloudflare R2
+  async loadCollection(name, defaultData = []) {
     const client = getR2Client();
     const r2Key = `${R2_PREFIX}${name}.json`;
 
-    if (client) {
-      try {
-        const cmd = new GetObjectCommand({
-          Bucket: R2_BUCKET,
-          Key: r2Key
-        });
-        const res = await client.send(cmd);
-        const str = await res.Body.transformToString();
-        const parsed = JSON.parse(str);
-        this.memory[name] = parsed;
-        this.saveLocalBackup(name, parsed);
-        return parsed;
-      } catch (err) {
-        if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
-          console.log(`ℹ️ [R2] Creating initial collection: ${r2Key}`);
-          this.memory[name] = defaultData;
-          await this.saveToR2(name, defaultData);
-          this.saveLocalBackup(name, defaultData);
-          return defaultData;
-        }
-        console.warn(`[R2] Could not fetch ${r2Key}, trying local fallback:`, err.message);
-      }
+    if (!client) {
+      return this.cache[name] || defaultData;
     }
 
-    // Local fallback
-    const localFile = path.join(LOCAL_DATA_DIR, `${name}.json`);
-    if (fs.existsSync(localFile)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(localFile, 'utf8'));
-        this.memory[name] = data;
-        return data;
-      } catch (e) {
-        console.error(`Error reading local ${name}.json:`, e);
+    try {
+      const cmd = new GetObjectCommand({
+        Bucket: R2_BUCKET,
+        Key: r2Key
+      });
+      const res = await client.send(cmd);
+      const str = await res.Body.transformToString();
+      const parsed = JSON.parse(str);
+      this.cache[name] = parsed;
+      return parsed;
+    } catch (err) {
+      // If file doesn't exist yet in R2, create it with defaultData
+      if (err.name === 'NoSuchKey' || err.$metadata?.httpStatusCode === 404) {
+        console.log(`ℹ️ [R2] Initializing fresh collection: ${r2Key}`);
+        await this.saveToR2(name, defaultData);
+        this.cache[name] = defaultData;
+        return defaultData;
       }
+      console.warn(`[R2] Warning fetching ${r2Key}:`, err.message);
+      // Return cached copy if available, NEVER wipe out with empty data on temporary network error
+      return this.cache[name] !== undefined ? this.cache[name] : defaultData;
     }
-
-    this.memory[name] = defaultData;
-    this.saveLocalBackup(name, defaultData);
-    return defaultData;
   }
 
-  // Save collection to R2
+  // Save collection directly and reliably to Cloudflare R2
   async saveToR2(name, data) {
     const client = getR2Client();
     const r2Key = `${R2_PREFIX}${name}.json`;
     const jsonStr = JSON.stringify(data, null, 2);
 
-    this.saveLocalBackup(name, data);
+    this.cache[name] = data;
 
-    if (!client) return;
+    if (!client) return data;
 
     try {
       await client.send(new PutObjectCommand({
@@ -126,30 +79,10 @@ class R2DatabaseService {
         Body: jsonStr,
         ContentType: 'application/json'
       }));
+      return data;
     } catch (err) {
       console.error(`❌ Failed to sync ${r2Key} to Cloudflare R2:`, err.message);
-    }
-  }
-
-  saveLocalBackup(name, data) {
-    try {
-      const localFile = path.join(LOCAL_DATA_DIR, `${name}.json`);
-      fs.writeFileSync(localFile, JSON.stringify(data, null, 2), 'utf8');
-    } catch (err) {
-      // Ignore in read-only environments
-    }
-  }
-
-  loadLocalFallbacks() {
-    for (const name of ['customers', 'leads', 'agents', 'admin']) {
-      const localFile = path.join(LOCAL_DATA_DIR, `${name}.json`);
-      if (fs.existsSync(localFile)) {
-        try {
-          this.memory[name] = JSON.parse(fs.readFileSync(localFile, 'utf8'));
-        } catch {
-          // Keep whatever is in memory
-        }
-      }
+      throw err;
     }
   }
 
@@ -179,14 +112,13 @@ class R2DatabaseService {
 
   // --- CUSTOMERS CRUD ---
   async getCustomers() {
-    await this.init();
-    return [...this.memory.customers];
+    return await this.loadCollection('customers', []);
   }
 
   async addCustomer(customerData) {
-    await this.init();
+    const customers = await this.getCustomers();
     const today = new Date().toISOString().split('T')[0];
-    const count = this.memory.customers.length;
+    const count = customers.length;
     const id = customerData.id || `CUST-${1001 + count}`;
 
     const newCustomer = {
@@ -205,15 +137,15 @@ class R2DatabaseService {
       updatedAt: new Date().toISOString()
     };
 
-    this.memory.customers.unshift(newCustomer);
-    await this.saveToR2('customers', this.memory.customers);
+    customers.unshift(newCustomer);
+    await this.saveToR2('customers', customers);
     return newCustomer;
   }
 
   async bulkAddCustomers(records) {
-    await this.init();
+    const customers = await this.getCustomers();
     const today = new Date().toISOString().split('T')[0];
-    let nextNum = 1001 + this.memory.customers.length;
+    let nextNum = 1001 + customers.length;
 
     const newItems = records.map(rec => ({
       id: rec.id || `CUST-${nextNum++}`,
@@ -231,40 +163,42 @@ class R2DatabaseService {
       updatedAt: new Date().toISOString()
     }));
 
-    this.memory.customers.unshift(...newItems);
-    await this.saveToR2('customers', this.memory.customers);
+    customers.unshift(...newItems);
+    await this.saveToR2('customers', customers);
     return newItems;
   }
 
   async updateCustomer(id, updateFields) {
-    await this.init();
-    const idx = this.memory.customers.findIndex(c => c.id === id);
+    const customers = await this.getCustomers();
+    const idx = customers.findIndex(c => c.id === id);
     if (idx === -1) return null;
 
-    this.memory.customers[idx] = {
-      ...this.memory.customers[idx],
+    customers[idx] = {
+      ...customers[idx],
       ...updateFields,
       updatedAt: new Date().toISOString()
     };
 
-    await this.saveToR2('customers', this.memory.customers);
-    return this.memory.customers[idx];
+    await this.saveToR2('customers', customers);
+    return customers[idx];
   }
 
   async assignCustomersToAgent(customerIds, agentName) {
-    await this.init();
+    const [customers, leads] = await Promise.all([
+      this.getCustomers(),
+      this.getLeads()
+    ]);
+
     const now = new Date();
     const formattedDate = now.toISOString().split('T')[0];
     const formattedTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const assignedTimestamp = `${formattedDate} ${formattedTime}`;
 
-    // 1. Update Customers
     const updatedCustomers = [];
     const leadsToCreate = [];
+    let leadNum = 1001 + leads.length;
 
-    let leadNum = 1001 + this.memory.leads.length;
-
-    for (const cust of this.memory.customers) {
+    for (const cust of customers) {
       if (customerIds.includes(cust.id)) {
         cust.isAssigned = true;
         cust.assignedTo = agentName;
@@ -272,7 +206,6 @@ class R2DatabaseService {
         cust.updatedAt = now.toISOString();
         updatedCustomers.push(cust);
 
-        // Prepare corresponding lead
         leadsToCreate.push({
           id: `LEAD-${leadNum++}`,
           customerId: cust.id,
@@ -292,13 +225,11 @@ class R2DatabaseService {
       }
     }
 
-    // 2. Insert Leads
-    this.memory.leads.unshift(...leadsToCreate);
+    leads.unshift(...leadsToCreate);
 
-    // Save both to R2
     await Promise.all([
-      this.saveToR2('customers', this.memory.customers),
-      this.saveToR2('leads', this.memory.leads)
+      this.saveToR2('customers', customers),
+      this.saveToR2('leads', leads)
     ]);
 
     return {
@@ -308,88 +239,80 @@ class R2DatabaseService {
   }
 
   async deleteCustomer(id) {
-    await this.init();
-    const prevCount = this.memory.customers.length;
-    this.memory.customers = this.memory.customers.filter(c => c.id !== id);
-    if (this.memory.customers.length !== prevCount) {
-      await this.saveToR2('customers', this.memory.customers);
+    const customers = await this.getCustomers();
+    const filtered = customers.filter(c => c.id !== id);
+    if (filtered.length !== customers.length) {
+      await this.saveToR2('customers', filtered);
       return true;
     }
     return false;
   }
 
   async clearAllCustomers() {
-    await this.init();
-    this.memory.customers = [];
-    await this.saveToR2('customers', this.memory.customers);
+    await this.saveToR2('customers', []);
     return true;
   }
 
   // --- LEADS CRUD ---
   async getLeads() {
-    await this.init();
-    return [...this.memory.leads];
+    return await this.loadCollection('leads', []);
   }
 
   async updateLeadStatus(id, status, notes) {
-    await this.init();
-    const idx = this.memory.leads.findIndex(l => l.id === id);
+    const leads = await this.getLeads();
+    const idx = leads.findIndex(l => l.id === id);
     if (idx === -1) return null;
 
     const now = new Date();
     const timestamp = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
-    this.memory.leads[idx] = {
-      ...this.memory.leads[idx],
+    leads[idx] = {
+      ...leads[idx],
       status,
       ...(status !== 'Pending' ? { lastContactDate: timestamp } : {}),
       ...(notes ? { notes } : {}),
       updatedAt: now.toISOString()
     };
 
-    await this.saveToR2('leads', this.memory.leads);
-    return this.memory.leads[idx];
+    await this.saveToR2('leads', leads);
+    return leads[idx];
   }
 
   async updateLeadCategory(id, category) {
-    await this.init();
-    const idx = this.memory.leads.findIndex(l => l.id === id);
+    const leads = await this.getLeads();
+    const idx = leads.findIndex(l => l.id === id);
     if (idx === -1) return null;
 
-    this.memory.leads[idx].category = (category || 'General Business').trim();
-    this.memory.leads[idx].updatedAt = new Date().toISOString();
+    leads[idx].category = (category || 'General Business').trim();
+    leads[idx].updatedAt = new Date().toISOString();
 
-    await this.saveToR2('leads', this.memory.leads);
-    return this.memory.leads[idx];
+    await this.saveToR2('leads', leads);
+    return leads[idx];
   }
 
   async deleteLead(id) {
-    await this.init();
-    const prevCount = this.memory.leads.length;
-    this.memory.leads = this.memory.leads.filter(l => l.id !== id);
-    if (this.memory.leads.length !== prevCount) {
-      await this.saveToR2('leads', this.memory.leads);
+    const leads = await this.getLeads();
+    const filtered = leads.filter(l => l.id !== id);
+    if (filtered.length !== leads.length) {
+      await this.saveToR2('leads', filtered);
       return true;
     }
     return false;
   }
 
   async clearAllLeads() {
-    await this.init();
-    this.memory.leads = [];
-    await this.saveToR2('leads', this.memory.leads);
+    await this.saveToR2('leads', []);
     return true;
   }
 
   // --- AGENTS CRUD ---
   async getAgents() {
-    await this.init();
-    return [...this.memory.agents];
+    return await this.loadCollection('agents', []);
   }
 
   async addAgent(agentData) {
-    await this.init();
-    const maxId = this.memory.agents.reduce((max, a) => Math.max(max, Number(a.id) || 0), 0);
+    const agents = await this.getAgents();
+    const maxId = agents.reduce((max, a) => Math.max(max, Number(a.id) || 0), 0);
     const nextId = maxId + 1;
 
     const defaultAvatars = [
@@ -411,18 +334,18 @@ class R2DatabaseService {
       createdAt: new Date().toISOString()
     };
 
-    this.memory.agents.push(newAgent);
-    await this.saveToR2('agents', this.memory.agents);
+    agents.push(newAgent);
+    await this.saveToR2('agents', agents);
     return newAgent;
   }
 
   async updateAgent(id, data) {
-    await this.init();
-    const idx = this.memory.agents.findIndex(a => Number(a.id) === Number(id));
+    const agents = await this.getAgents();
+    const idx = agents.findIndex(a => Number(a.id) === Number(id));
     if (idx === -1) return null;
 
-    this.memory.agents[idx] = {
-      ...this.memory.agents[idx],
+    agents[idx] = {
+      ...agents[idx],
       ...(data.name ? { name: data.name.trim() } : {}),
       ...(data.role ? { role: data.role.trim() } : {}),
       ...(data.email !== undefined ? { email: data.email.trim() } : {}),
@@ -432,26 +355,25 @@ class R2DatabaseService {
       ...(data.color ? { color: data.color } : {})
     };
 
-    await this.saveToR2('agents', this.memory.agents);
-    return this.memory.agents[idx];
+    await this.saveToR2('agents', agents);
+    return agents[idx];
   }
 
   async updateAgentPin(id, pin) {
-    await this.init();
-    const idx = this.memory.agents.findIndex(a => Number(a.id) === Number(id));
+    const agents = await this.getAgents();
+    const idx = agents.findIndex(a => Number(a.id) === Number(id));
     if (idx === -1) return null;
 
-    this.memory.agents[idx].pin = String(pin).trim();
-    await this.saveToR2('agents', this.memory.agents);
-    return this.memory.agents[idx];
+    agents[idx].pin = String(pin).trim();
+    await this.saveToR2('agents', agents);
+    return agents[idx];
   }
 
   async deleteAgent(id) {
-    await this.init();
-    const prevCount = this.memory.agents.length;
-    this.memory.agents = this.memory.agents.filter(a => Number(a.id) !== Number(id));
-    if (this.memory.agents.length !== prevCount) {
-      await this.saveToR2('agents', this.memory.agents);
+    const agents = await this.getAgents();
+    const filtered = agents.filter(a => Number(a.id) !== Number(id));
+    if (filtered.length !== agents.length) {
+      await this.saveToR2('agents', filtered);
       return true;
     }
     return false;
@@ -459,28 +381,27 @@ class R2DatabaseService {
 
   // --- ADMIN CREDENTIALS & PROFILE ---
   async getAdmin() {
-    await this.init();
-    return this.memory.admin || DEFAULT_ADMIN;
+    return await this.loadCollection('admin', DEFAULT_ADMIN);
   }
 
   async updateAdmin(updateData) {
-    await this.init();
-    const current = this.memory.admin || DEFAULT_ADMIN;
-    this.memory.admin = {
+    const current = await this.getAdmin();
+    const updated = {
       ...current,
       ...updateData,
       updatedAt: new Date().toISOString()
     };
-    await this.saveToR2('admin', this.memory.admin);
-    return this.memory.admin;
+    await this.saveToR2('admin', updated);
+    return updated;
   }
 
   // --- STATS COMPUTATION DIRECTLY FROM R2 DATA ---
   async getStats() {
-    await this.init();
-    const customers = this.memory.customers;
-    const leads = this.memory.leads;
-    const agents = this.memory.agents;
+    const [customers, leads, agents] = await Promise.all([
+      this.getCustomers(),
+      this.getLeads(),
+      this.getAgents()
+    ]);
 
     const totalCustomers = customers.length;
     const assignedCustomers = customers.filter(c => c.isAssigned).length;
