@@ -6,10 +6,11 @@ import {
   RefreshCw,
   Menu,
   ShieldCheck,
-  X
+  X,
+  UserPlus
 } from 'lucide-react';
 
-export const Header = ({ onOpenUpload, searchQuery, setSearchQuery, onToggleMobileMenu }) => {
+export const Header = ({ onOpenUpload, onOpenAddLead, searchQuery, setSearchQuery, onToggleMobileMenu }) => {
   const { customers, leads, dbStatus, auth, adminProfile, updateAdminProfile, syncNow } = useCrm();
 
   // Admin Profile Edit Modal State
@@ -91,6 +92,18 @@ export const Header = ({ onOpenUpload, searchQuery, setSearchQuery, onToggleMobi
           >
             <Upload className="w-3.5 h-3.5 text-white" />
             <span className="hidden sm:inline">Upload</span>
+          </button>
+        )}
+
+        {/* Quick Add Lead Button (For Team Members & Admin) */}
+        {onOpenAddLead && (
+          <button
+            onClick={onOpenAddLead}
+            className="p-2 sm:px-3 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer active:scale-95"
+            title="Add a new lead directly into pipeline"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-white" />
+            <span className="hidden sm:inline">+ Lead</span>
           </button>
         )}
 

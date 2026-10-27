@@ -415,6 +415,44 @@ export const CrmProvider = ({ children }) => {
     }
   }, [addToast]);
 
+  // 4b. ADD SINGLE LEAD MANUALLY (Team Member / Admin) strictly to Cloudflare R2
+  const addLead = useCallback(async (leadData) => {
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leadData)
+      });
+
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}));
+        throw new Error(errorJson.error || `Failed to add lead (Status: ${res.status})`);
+      }
+
+      const result = await res.json();
+      const newLead = result.data;
+
+      // Optimistically / immediately update local state
+      setLeads(prev => [newLead, ...prev]);
+
+      addToast({
+        title: 'Lead Added to Pipeline',
+        message: `"${newLead.name}" assigned to ${newLead.assignedAgent || 'agent'} saved to Cloudflare R2.`,
+        type: 'success'
+      });
+
+      return newLead;
+    } catch (err) {
+      console.error('Add lead error:', err);
+      addToast({
+        title: 'Failed to Add Lead',
+        message: err.message || 'Could not save lead to Cloudflare R2',
+        type: 'error'
+      });
+      return null;
+    }
+  }, [addToast]);
+
   // 5. DELETE CUSTOMERS strictly in Cloudflare R2
   const deleteCustomers = useCallback(async (customerIds) => {
     if (!customerIds || customerIds.length === 0) return;
@@ -971,6 +1009,7 @@ export const CrmProvider = ({ children }) => {
     updateLeadCategory,
     updateCustomerCategory,
     addSingleCustomer,
+    addLead,
     deleteCustomers,
     deleteAllCustomers,
     unassignCustomers,

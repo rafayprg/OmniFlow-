@@ -20,10 +20,11 @@ import {
   Sparkles,
   Briefcase,
   Clock,
-  Filter
+  Filter,
+  UserPlus
 } from 'lucide-react';
 
-export const LeadsModule = ({ searchQuery, setSearchQuery }) => {
+export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
   const { 
     leads, 
     agents, 
@@ -228,6 +229,17 @@ export const LeadsModule = ({ searchQuery, setSearchQuery }) => {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+          {onOpenAddLead && (
+            <button
+              onClick={onOpenAddLead}
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer"
+              title="Add a new lead directly into pipeline"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>+ Add Lead</span>
+            </button>
+          )}
+
           <button
             onClick={handleExportLeadsExcel}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
@@ -383,9 +395,18 @@ export const LeadsModule = ({ searchQuery, setSearchQuery }) => {
           <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
             <PhoneForwarded className="w-8 h-8 mx-auto mb-2 opacity-40 text-blue-600" />
             <p className="font-semibold text-slate-700 text-sm">No leads in this filter</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Try selecting "All Categories" or clearing the status filter.
+            <p className="text-xs text-slate-400 mt-1 mb-3">
+              Try selecting "All Categories", clearing the filter, or add a new lead directly.
             </p>
+            {onOpenAddLead && (
+              <button
+                onClick={onOpenAddLead}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/20 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Add New Lead</span>
+              </button>
+            )}
           </div>
         ) : (
           filteredLeads.map((lead) => {
@@ -647,11 +668,20 @@ export const LeadsModule = ({ searchQuery, setSearchQuery }) => {
                   <td colSpan={8} className="py-12 text-center text-slate-400">
                     <PhoneForwarded className="w-8 h-8 mx-auto mb-2 opacity-40 text-blue-600" />
                     <p className="font-semibold text-slate-600">No leads in this filter</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5 mb-3">
                       {leads.length === 0
-                        ? 'Assign raw customers from the Customers section to build your leads pipeline.'
+                        ? 'No leads found in pipeline. Click below to add a new lead.'
                         : 'Try changing the category or status tabs, or clearing the search query.'}
                     </p>
+                    {onOpenAddLead && (
+                      <button
+                        onClick={onOpenAddLead}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/20 cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>+ Add New Lead</span>
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (

@@ -18,6 +18,29 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST create new lead directly in Cloudflare R2
+router.post('/', async (req, res) => {
+  try {
+    const { name, phone } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, error: 'Lead / Company name is required' });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ success: false, error: 'Phone number is required' });
+    }
+
+    const newLead = await r2Db.addLead(req.body);
+    res.status(201).json({
+      success: true,
+      message: 'Lead created successfully in Cloudflare R2',
+      data: newLead,
+      source: 'cloudflare-r2'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // PUT update lead status strictly in Cloudflare R2
 router.put('/:id/status', async (req, res) => {
   try {

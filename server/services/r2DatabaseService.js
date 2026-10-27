@@ -258,6 +258,34 @@ class R2DatabaseService {
     return await this.loadCollection('leads', []);
   }
 
+  async addLead(leadData) {
+    const leads = await this.getLeads();
+    const today = new Date().toISOString().split('T')[0];
+    const nextNum = 1001 + leads.length;
+
+    const newLead = {
+      id: leadData.id || `LEAD-${nextNum}`,
+      customerId: leadData.customerId || `DIRECT-${Date.now()}`,
+      name: leadData.name ? leadData.name.trim() : 'Unnamed Lead',
+      phone: leadData.phone ? leadData.phone.trim() : '0300-0000000',
+      email: leadData.email ? leadData.email.trim() : '',
+      source: leadData.source || 'Manual Team Entry',
+      category: leadData.category ? leadData.category.trim() : 'General Business',
+      city: leadData.city ? leadData.city.trim() : 'Karachi',
+      assignedAgent: leadData.assignedAgent || 'Unassigned',
+      status: leadData.status || 'Pending',
+      notes: leadData.notes ? leadData.notes.trim() : 'Directly entered by team member.',
+      assignedDate: today,
+      lastContactDate: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    leads.unshift(newLead);
+    await this.saveToR2('leads', leads);
+    return newLead;
+  }
+
   async updateLeadStatus(id, status, notes) {
     const leads = await this.getLeads();
     const idx = leads.findIndex(l => l.id === id);

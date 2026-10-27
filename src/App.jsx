@@ -7,6 +7,7 @@ import { LeadsModule } from './components/LeadsModule';
 import { DashboardModule } from './components/DashboardModule';
 import { TeamModule } from './components/TeamModule';
 import { BulkUploadModal } from './components/BulkUploadModal';
+import { AddLeadModal } from './components/AddLeadModal';
 import { ToastContainer } from './components/ToastContainer';
 import { LoginScreen } from './components/LoginScreen';
 import { LayoutDashboard, Database, PhoneForwarded, Users2, LogOut } from 'lucide-react';
@@ -14,6 +15,7 @@ import { LayoutDashboard, Database, PhoneForwarded, Users2, LogOut } from 'lucid
 const MainLayout = () => {
   const { activeTab, setActiveTab, auth, logout, leads } = useCrm();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -51,6 +53,7 @@ const MainLayout = () => {
         {/* Top Header */}
         <Header 
           onOpenUpload={handleOpenUpload}
+          onOpenAddLead={() => setIsAddLeadOpen(true)}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
@@ -75,6 +78,7 @@ const MainLayout = () => {
                 <LeadsModule 
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
+                  onOpenAddLead={() => setIsAddLeadOpen(true)}
                 />
               )
             )}
@@ -83,6 +87,7 @@ const MainLayout = () => {
               <LeadsModule 
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
+                onOpenAddLead={() => setIsAddLeadOpen(true)}
               />
             )}
 
@@ -94,6 +99,7 @@ const MainLayout = () => {
                 <LeadsModule 
                   searchQuery={searchQuery}
                   setSearchQuery={setSearchQuery}
+                  onOpenAddLead={() => setIsAddLeadOpen(true)}
                 />
               )
             )}
@@ -168,6 +174,12 @@ const MainLayout = () => {
           onFinishGoToCustomers={handleUploadFinishGoToCustomers}
         />
       )}
+
+      {/* Add Lead Direct Entry Modal (Available for Team Members & Admin) */}
+      <AddLeadModal
+        isOpen={isAddLeadOpen}
+        onClose={() => setIsAddLeadOpen(false)}
+      />
 
       {/* Toast Alerts */}
       <ToastContainer />
