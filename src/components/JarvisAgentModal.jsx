@@ -77,7 +77,15 @@ export const parseJarvisPrompt = (rawText, currentUser) => {
     tiktok = tiktokMatch[1];
   }
 
-  // 6. Extract LinkedIn
+  // 6. Extract Facebook
+  let facebook = '';
+  const fbRegex = /(?:facebook\.com\/(?:p\/)?|fb(?::|\s+)?@?)([a-zA-Z0-9._-]{3,50})/i;
+  const fbMatch = text.match(fbRegex);
+  if (fbMatch) {
+    facebook = fbMatch[1];
+  }
+
+  // 7. Extract LinkedIn
   let linkedin = '';
   const linkedinRegex = /(?:linkedin\.com\/(?:in|company)\/|linkedin(?::|\s+)?)([a-zA-Z0-9-_]{3,40})/i;
   const linkedinMatch = text.match(linkedinRegex);
@@ -85,7 +93,7 @@ export const parseJarvisPrompt = (rawText, currentUser) => {
     linkedin = linkedinMatch[1];
   }
 
-  // 7. Extract YouTube
+  // 8. Extract YouTube
   let youtube = '';
   const ytRegex = /(?:youtube\.com\/(?:@|c\/|user\/)?|yt(?::|\s+)?@?)([a-zA-Z0-9._-]{3,40})/i;
   const ytMatch = text.match(ytRegex);
@@ -93,7 +101,23 @@ export const parseJarvisPrompt = (rawText, currentUser) => {
     youtube = ytMatch[1];
   }
 
-  // 8. Extract City
+  // 9. Extract Twitter / X
+  let twitter = '';
+  const twitterRegex = /(?:twitter\.com\/|x\.com\/|twitter(?::|\s+)?@?)([a-zA-Z0-9._-]{3,40})/i;
+  const twitterMatch = text.match(twitterRegex);
+  if (twitterMatch) {
+    twitter = twitterMatch[1];
+  }
+
+  // 10. Extract Address
+  let address = '';
+  const addressRegex = /(?:address(?::|\s+)?|located at\s+)?([0-9A-Za-z\s,-]+(?:street|road|rd|st|phase|dha|block|plot|suite|sector|floor|chowk|bazaar|market|town)[0-9A-Za-z\s,-]*)/i;
+  const addressMatch = text.match(addressRegex);
+  if (addressMatch) {
+    address = addressMatch[1].trim().replace(/^,\s*|,\s*$/g, '');
+  }
+
+  // 11. Extract City
   let city = 'Karachi';
   for (const c of CITIES_LIST) {
     const cityRegex = new RegExp(`\\b${c}\\b`, 'i');
@@ -171,14 +195,17 @@ export const parseJarvisPrompt = (rawText, currentUser) => {
     name,
     phone: phone || '0300-0000000',
     email,
+    address,
     category,
     city,
     status,
     website,
     instagram,
+    facebook,
     tiktok,
     linkedin,
     youtube,
+    twitter,
     notes: text,
     assignedAgent: currentUser?.type === 'agent' ? currentUser?.name : 'Fareed',
     source: 'Jarvis AI Agent'

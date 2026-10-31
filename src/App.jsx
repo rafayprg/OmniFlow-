@@ -11,6 +11,7 @@ import { AddLeadModal } from './components/AddLeadModal';
 import { JarvisAgentModal } from './components/JarvisAgentModal';
 import { ToastContainer } from './components/ToastContainer';
 import { LoginScreen } from './components/LoginScreen';
+import { Analytics } from '@vercel/analytics/react';
 import { LayoutDashboard, Database, PhoneForwarded, Users2, LogOut, Cpu, Sparkles } from 'lucide-react';
 
 const MainLayout = () => {
@@ -219,6 +220,7 @@ export default function App() {
   return (
     <CrmProvider>
       <MainLayout />
+      <Analytics />
     </CrmProvider>
   );
 }

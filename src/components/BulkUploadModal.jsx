@@ -116,66 +116,66 @@ export const BulkUploadModal = ({ isOpen, onClose, onFinishGoToCustomers, initia
       const lower = String(h).toLowerCase().trim().replace(/[_-]/g, ' ');
 
       // 1. Business Name
-      if (!mapping.name && /^(name|business name|company|company name|firm|store|title|place name|client|customer name|business)$/i.test(lower)) {
+      if (!mapping.name && /(name|business name|company|company name|firm|store|title|place name|client|customer name|business)/i.test(lower)) {
         mapping.name = h;
-      } else if (!mapping.contactPerson && /^(contact person|person|contact name|owner|manager|founder|rep)$/i.test(lower)) {
+      } else if (!mapping.contactPerson && /(contact person|person|contact name|owner|manager|founder|rep)/i.test(lower)) {
         mapping.contactPerson = h;
       }
       
       // 2. Contact
-      else if (!mapping.phone && /(phone|mobile|cell|contact number|tel|whatsapp|number)$/i.test(lower)) {
+      else if (!mapping.phone && /(phone|mobile|cell|contact number|tel|whatsapp|contact phone|phone numbers)/i.test(lower)) {
         mapping.phone = h;
-      } else if (!mapping.email && /(email|mail|e mail|contact email)$/i.test(lower)) {
+      } else if (!mapping.email && /(email|mail|e mail|contact email|email address)/i.test(lower)) {
         mapping.email = h;
       }
 
       // 3. Address
-      else if (!mapping.address && /(full address|street address|address|formatted address|place address|location address)$/i.test(lower)) {
+      else if (!mapping.address && /(full address|street address|branch address|formatted address|place address|location address|\baddress\b|street|location)/i.test(lower)) {
         mapping.address = h;
-      } else if (!mapping.city && /^(city|town|district)$/i.test(lower)) {
+      } else if (!mapping.city && /(city|town|district)/i.test(lower)) {
         mapping.city = h;
-      } else if (!mapping.state && /^(state|province|region)$/i.test(lower)) {
+      } else if (!mapping.state && /(state|province|region)/i.test(lower)) {
         mapping.state = h;
-      } else if (!mapping.postalCode && /^(zip|zipcode|postal|postal code|post code)$/i.test(lower)) {
+      } else if (!mapping.postalCode && /(zip|zipcode|postal|postal code|post code)/i.test(lower)) {
         mapping.postalCode = h;
-      } else if (!mapping.country && /^(country|nation)$/i.test(lower)) {
+      } else if (!mapping.country && /(country|nation)/i.test(lower)) {
         mapping.country = h;
       }
 
       // 4. Industry
-      else if (!mapping.industry && /(industry|category|categories|business type|sector|niche|primary type|sub category)$/i.test(lower)) {
+      else if (!mapping.industry && /(industry|category|categories|business type|sector|niche|primary type|sub category|specialty|services)/i.test(lower)) {
         mapping.industry = h;
         mapping.category = h;
       }
 
       // 5. Socials
-      else if (!mapping.instagram && /(instagram|insta|ig url|instagram url|ig)$/i.test(lower)) {
+      else if (!mapping.instagram && /(instagram|insta|ig url|instagram url|\big\b)/i.test(lower)) {
         mapping.instagram = h;
-      } else if (!mapping.facebook && /(facebook|fb|fb page|facebook url|fb url)$/i.test(lower)) {
+      } else if (!mapping.facebook && /(facebook|fb page|facebook url|fb url|\bfb\b)/i.test(lower)) {
         mapping.facebook = h;
-      } else if (!mapping.linkedin && /(linkedin|li|linkedin url)$/i.test(lower)) {
+      } else if (!mapping.linkedin && /(linkedin|linkedin url|\bli\b)/i.test(lower)) {
         mapping.linkedin = h;
-      } else if (!mapping.tiktok && /(tiktok|tt|tiktok url)$/i.test(lower)) {
+      } else if (!mapping.tiktok && /(tiktok|tiktok url|\btt\b)/i.test(lower)) {
         mapping.tiktok = h;
-      } else if (!mapping.youtube && /(youtube|yt|youtube channel)$/i.test(lower)) {
+      } else if (!mapping.youtube && /(youtube|yt|youtube channel)/i.test(lower)) {
         mapping.youtube = h;
-      } else if (!mapping.twitter && /(twitter|x|twitter url)$/i.test(lower)) {
+      } else if (!mapping.twitter && /(twitter|x \/ twitter|\bx\b|twitter url)/i.test(lower)) {
         mapping.twitter = h;
-      } else if (!mapping.socialsCombined && /(socials|social media|social links|profiles)$/i.test(lower)) {
+      } else if (!mapping.socialsCombined && /(socials|social media|social links|profiles)/i.test(lower)) {
         mapping.socialsCombined = h;
       }
 
       // 6. Website
-      else if (!mapping.website && /(website|web|url|site|domain|homepage|web link)$/i.test(lower)) {
+      else if (!mapping.website && /(official website|website url|website|site|domain|homepage|web link|\bweb\b|\burl\b)/i.test(lower)) {
         mapping.website = h;
       }
 
       // 7. Reviews
-      else if (!mapping.rating && /(rating|stars|score|google rating|average rating|review rating)$/i.test(lower)) {
+      else if (!mapping.rating && /(google rating|rating|stars|total score|score|average rating|review rating)/i.test(lower)) {
         mapping.rating = h;
-      } else if (!mapping.reviewCount && /(reviews count|review count|total reviews|num reviews|num of reviews|reviews)$/i.test(lower)) {
+      } else if (!mapping.reviewCount && /(google reviews count|reviews count|review count|total reviews|num reviews|num of reviews|reviews)/i.test(lower)) {
         mapping.reviewCount = h;
-      } else if (!mapping.reviews && /(review snippet|reviews text|testimonial|feedback|review)$/i.test(lower)) {
+      } else if (!mapping.reviews && /(review snippet|reviews text|testimonial|feedback|review feedback)/i.test(lower)) {
         mapping.reviews = h;
       }
     });
@@ -465,14 +465,10 @@ export const BulkUploadModal = ({ isOpen, onClose, onFinishGoToCustomers, initia
         setImportedCount(result.length);
         setImportSuccess(true);
       } else {
-        // Customer Pool import
+        // Customer Pool import with full 7 sections preserved
         const custRecords = organizedPreviewRecords.map(r => ({
-          name: r.name,
-          phone: r.phone,
-          email: r.email,
-          city: r.city,
-          category: r.category,
-          source: r.source
+          ...r,
+          importedDate: new Date().toISOString().split('T')[0]
         }));
         const result = await bulkUploadCustomers(custRecords, fileData.fileName || 'Customers_Upload.xlsx');
         setImportedCount(result.length);
