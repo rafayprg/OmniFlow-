@@ -1,36 +1,36 @@
 import React, { useState } from 'react';
 import { useCrm } from '../context/CrmContext';
-import { 
-  X, 
-  Building2, 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Briefcase, 
-  Globe, 
-  Star, 
-  FileText, 
-  ExternalLink, 
-  Clock, 
-  Copy, 
-  Check, 
-  Share2, 
-  Layers, 
+import {
+  X,
+  Building2,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Briefcase,
+  Globe,
+  Star,
+  FileText,
+  ExternalLink,
+  Clock,
+  Copy,
+  Check,
+  Share2,
+  Layers,
   Sparkles
 } from 'lucide-react';
 import { StatusBadge } from './StatusBadge';
 import { formatWhatsAppUrl, formatTelUrl, WhatsAppIcon } from '../utils/phoneUtils';
 import { getCategoryConfig, CategoryBadge } from '../utils/categoryUtils';
-import { 
-  ReviewsRating, 
-  FacebookIcon, 
-  InstagramIcon, 
-  LinkedInIcon, 
-  TikTokIcon, 
-  YouTubeIcon, 
+import {
+  ReviewsRating,
+  FacebookIcon,
+  InstagramIcon,
+  LinkedInIcon,
+  TikTokIcon,
+  YouTubeIcon,
   TwitterIcon,
-  formatSocialUrl 
+  formatSocialUrl
 } from '../utils/socialUtils';
 
 export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
@@ -50,8 +50,8 @@ export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
 
   const addressParts = [lead.address, lead.city, lead.state, lead.country].filter(Boolean);
   const fullAddress = addressParts.join(', ');
-  const mapsUrl = fullAddress 
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` 
+  const mapsUrl = fullAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
     : (lead.name ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lead.name + ' ' + (lead.city || ''))}` : null);
 
   const handleCopy = (text, keyName) => {
@@ -82,7 +82,7 @@ export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-        
+
         {/* Top Header */}
         <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/90 flex items-start justify-between gap-3 shrink-0">
           <div className="min-w-0 flex-1">
@@ -137,11 +137,10 @@ export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
         <div className="flex items-center px-5 border-b border-slate-200 bg-white gap-4 text-xs font-bold text-slate-600 shrink-0">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-2.5 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'overview'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent hover:text-slate-900'
-            }`}
+            className={`py-2.5 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${activeTab === 'overview'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent hover:text-slate-900'
+              }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Organized Lead Profile (7 Sections)</span>
@@ -149,11 +148,10 @@ export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
 
           <button
             onClick={() => setActiveTab('sheetData')}
-            className={`py-2.5 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'sheetData'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent hover:text-slate-900'
-            }`}
+            className={`py-2.5 border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${activeTab === 'sheetData'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent hover:text-slate-900'
+              }`}
           >
             <Layers className="w-3.5 h-3.5" />
             <span>All Sheet Columns ({Object.keys(rawDetails).length})</span>
@@ -463,10 +461,10 @@ export const LeadDetailsModal = ({ lead, isOpen, onClose }) => {
 
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <ReviewsRating 
-                      rating={lead.rating} 
-                      reviewCount={lead.reviewCount} 
-                      compact={false} 
+                    <ReviewsRating
+                      rating={lead.rating}
+                      reviewCount={lead.reviewCount}
+                      compact={false}
                     />
 
                     {(!lead.rating && !lead.reviewCount) && (

@@ -285,6 +285,21 @@ export const LoginScreen = () => {
                 <ArrowRight className="w-4 h-4" />
               </button>
 
+              {/* Quick Fill Demo Credentials */}
+              <div className="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-center space-y-1">
+                <p className="text-[10px] text-slate-400">Default Admin Credentials:</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminEmail('sales@techdeva.net');
+                    setAdminPassword('Techdeva@12');
+                  }}
+                  className="w-full py-1.5 px-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-lg text-[11px] font-mono font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>⚡ 1-Click Fill: sales@techdeva.net / Techdeva@12</span>
+                </button>
+              </div>
+
               {/* Toggle Setup / Edit Mode */}
               <div className="pt-2 text-center">
                 <button
@@ -403,6 +418,33 @@ export const LoginScreen = () => {
                       Please enter the security PIN assigned to you by your Administrator.
                     </p>
                   </div>
+
+                  {/* Quick Select Agent Chips */}
+                  {agents.length > 0 && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[10px] text-slate-400 text-center">Quick 1-Tap Agent Select:</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {agents.map(a => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedAgentId(Number(a.id));
+                              setAgentPin(a.pin || '1234');
+                            }}
+                            className={`py-1.5 px-1.5 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer text-center ${
+                              Number(selectedAgentId) === Number(a.id)
+                                ? 'bg-indigo-600/30 border-indigo-400 text-indigo-200 shadow-xs'
+                                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                            }`}
+                          >
+                            <span className="block truncate font-bold">{a.name}</span>
+                            <span className="block text-[9px] text-indigo-400 font-mono">PIN: {a.pin || '1234'}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <button
                     type="submit"

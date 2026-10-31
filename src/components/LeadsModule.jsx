@@ -39,6 +39,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead, onOpen
   } = useCrm();
 
   const isAgent = auth?.type === 'agent';
+  const [agentViewScope, setAgentViewScope] = useState('ALL'); // 'ALL' | 'MY' | 'UNASSIGNED'
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [activeStatusTab, setActiveStatusTab] = useState('ALL');
   const [agentFilter, setAgentFilter] = useState('ALL');
@@ -50,10 +51,25 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead, onOpen
   // Upload raw data modal state
   const [isLocalUploadOpen, setIsLocalUploadOpen] = useState(false);
 
+  const myAssignedCount = useMemo(() => {
+    return leads.filter(l => l.assignedAgent === auth?.name).length;
+  }, [leads, auth]);
+
+  const unassignedCount = useMemo(() => {
+    return leads.filter(l => !l.assignedAgent || l.assignedAgent === 'Unassigned').length;
+  }, [leads]);
+
   // Leads scoped to this user
   const scopedLeads = useMemo(() => {
-    return isAgent ? leads.filter(l => l.assignedAgent === auth?.name) : leads;
-  }, [leads, isAgent, auth]);
+    if (!isAgent) return leads;
+    if (agentViewScope === 'MY') {
+      return leads.filter(l => l.assignedAgent === auth?.name);
+    }
+    if (agentViewScope === 'UNASSIGNED') {
+      return leads.filter(l => !l.assignedAgent || l.assignedAgent === 'Unassigned');
+    }
+    return leads; // 'ALL'
+  }, [leads, isAgent, auth, agentViewScope]);
 
   // Compute dynamic category pills based on uploaded data in the pipeline
   const categoryPills = useMemo(() => {
@@ -268,6 +284,38 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead, onOpen
           <p className="text-xs text-slate-500 mt-0.5">
             Structured records containing: <strong>Business, Contact, Address, Industry, Socials, Website & Reviews</strong>. Click phone for 1-tap WhatsApp.
           </p>
+
+          {isAgent && (
+            <div className="flex items-center gap-1.5 mt-2.5 p-1 bg-slate-200/80 rounded-xl w-fit">
+              <button
+                type="button"
+                onClick={() => setAgentViewScope('ALL')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  agentViewScope === 'ALL' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Team Leads ({leads.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgentViewScope('MY')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  agentViewScope === 'MY' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                My Leads ({myAssignedCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setAgentViewScope('UNASSIGNED')}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  agentViewScope === 'UNASSIGNED' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Unassigned Pool ({unassignedCount})
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto shrink-0">

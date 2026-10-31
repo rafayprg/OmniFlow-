@@ -29,8 +29,8 @@ app.use(async (req, res, next) => {
   next();
 });
 
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
+// Health check endpoint (both /api/health and /health)
+const healthHandler = async (req, res) => {
   let r2Status = 'Disconnected';
   let r2Error = null;
   const isR2Configured = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_ACCESS_KEY_ID);
@@ -57,7 +57,10 @@ app.get('/api/health', async (req, res) => {
     r2Error,
     r2Configured: isR2Configured
   });
-});
+};
+
+app.get('/api/health', healthHandler);
+app.get('/health', healthHandler);
 
 // Mount Routes - Support both with and without /api prefix for Vercel Serverless Rewrites
 app.use('/api/customers', customerRoutes);
