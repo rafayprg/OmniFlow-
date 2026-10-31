@@ -91,6 +91,7 @@ const MainLayout = () => {
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 onOpenAddLead={() => setIsAddLeadOpen(true)}
+                onOpenUpload={handleOpenUpload}
               />
             )}
 
@@ -169,14 +170,13 @@ const MainLayout = () => {
         </nav>
       </div>
 
-      {/* Bulk Upload Modal (Admin only) */}
-      {auth.type === 'admin' && (
-        <BulkUploadModal
-          isOpen={isUploadOpen}
-          onClose={handleCloseUpload}
-          onFinishGoToCustomers={handleUploadFinishGoToCustomers}
-        />
-      )}
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={isUploadOpen}
+        onClose={handleCloseUpload}
+        onFinishGoToCustomers={handleUploadFinishGoToCustomers}
+        initialTarget={activeTab === 'leads' ? 'leads' : 'customers'}
+      />
 
       {/* Add Lead Direct Entry Modal (Available for Team Members & Admin) */}
       <AddLeadModal

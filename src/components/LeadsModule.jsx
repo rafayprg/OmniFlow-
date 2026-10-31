@@ -1,31 +1,32 @@
 import React, { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useCrm } from '../context/CrmContext';
-import { StatusBadge, SourceBadge } from './StatusBadge';
+import { StatusBadge } from './StatusBadge';
 import { formatWhatsAppUrl, formatTelUrl, WhatsAppIcon } from '../utils/phoneUtils';
 import { BUSINESS_CATEGORIES, getCategoryConfig, CategoryBadge } from '../utils/categoryUtils';
-import { SocialLinksBadges } from '../utils/socialUtils';
+import { 
+  SocialLinksBadges, 
+  ReviewsRating, 
+  AddressLocation 
+} from '../utils/socialUtils';
+import { LeadDetailsModal } from './LeadDetailsModal';
+import { BulkUploadModal } from './BulkUploadModal';
 import { 
   PhoneForwarded, 
   Phone, 
-  PhoneMissed,
   ChevronDown, 
   Check, 
   Database, 
   Download, 
   Trash2,
-  MessageSquare,
-  FileText,
-  Calendar,
-  User,
-  Sparkles,
   Briefcase,
   Clock,
-  Filter,
-  UserPlus
+  UserPlus,
+  Upload,
+  Eye
 } from 'lucide-react';
 
-export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
+export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead, onOpenUpload }) => {
   const { 
     leads, 
     agents, 
@@ -44,6 +45,11 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
   const [activeNoteLeadId, setActiveNoteLeadId] = useState(null);
   const [noteDraft, setNoteDraft] = useState('');
 
+  // Selected lead for full details modal
+  const [selectedLeadForDetails, setSelectedLeadForDetails] = useState(null);
+  // Upload raw data modal state
+  const [isLocalUploadOpen, setIsLocalUploadOpen] = useState(false);
+
   // Leads scoped to this user
   const scopedLeads = useMemo(() => {
     return isAgent ? leads.filter(l => l.assignedAgent === auth?.name) : leads;
@@ -53,7 +59,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
   const categoryPills = useMemo(() => {
     const counts = {};
     scopedLeads.forEach(l => {
-      const cat = l.category || 'General Business';
+      const cat = l.category || l.industry || 'General Business';
       counts[cat] = (counts[cat] || 0) + 1;
     });
 
@@ -86,7 +92,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
 
   const filteredLeads = useMemo(() => {
     return scopedLeads.filter(lead => {
-      const leadCat = lead.category || 'General Business';
+      const leadCat = lead.category || lead.industry || 'General Business';
       
       // 1. Category Filter
       if (selectedCategory !== 'ALL' && leadCat !== selectedCategory) {
@@ -104,13 +110,17 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
       }
 
       // 4. Search Filter
-      const matchesSearch = !searchQuery ||
-        lead.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.phone?.includes(searchQuery) ||
-        lead.id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        leadCat.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        lead.assignedAgent?.toLowerCase().includes(searchQuery.toLowerCase());
+      const q = (searchQuery || '').toLowerCase().trim();
+      const matchesSearch = !q ||
+        (lead.name && lead.name.toLowerCase().includes(q)) ||
+        (lead.phone && String(lead.phone).includes(q)) ||
+        (lead.id && String(lead.id).toLowerCase().includes(q)) ||
+        (lead.email && lead.email.toLowerCase().includes(q)) ||
+        (lead.address && lead.address.toLowerCase().includes(q)) ||
+        (lead.city && lead.city.toLowerCase().includes(q)) ||
+        (lead.contactPerson && lead.contactPerson.toLowerCase().includes(q)) ||
+        (leadCat && leadCat.toLowerCase().includes(q)) ||
+        (lead.assignedAgent && lead.assignedAgent.toLowerCase().includes(q));
 
       return matchesSearch;
     });
@@ -120,68 +130,86 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
     {
       id: 'ALL',
       label: isAgent ? 'My Leads' : 'All Leads',
-      count: scopedLeads.filter(l => selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory).length,
+      count: scopedLeads.filter(l => selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory).length,
       badgeClass: 'bg-slate-200 text-slate-700'
     },
     {
       id: 'Pending',
       label: 'Pending',
-      count: scopedLeads.filter(l => l.status === 'Pending' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Pending' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-amber-100 text-amber-800 font-bold',
       desc: 'Awaiting outreach'
     },
     {
       id: 'Connected',
       label: 'Connected',
-      count: scopedLeads.filter(l => l.status === 'Connected' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Connected' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-blue-100 text-blue-800 font-bold',
       desc: 'In discussions'
     },
     {
       id: 'Not Connected',
       label: '📞 Not Connected',
-      count: scopedLeads.filter(l => l.status === 'Not Connected' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Not Connected' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-orange-100 text-orange-800 font-bold',
       desc: 'Call placed but did not connect (no answer / busy)'
     },
     {
       id: 'Interested',
       label: 'Interested (Hot)',
-      count: scopedLeads.filter(l => l.status === 'Interested' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Interested' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-emerald-100 text-emerald-800 font-bold',
       desc: 'Ready to convert'
     },
     {
       id: 'Not Interested',
       label: 'Not Interested',
-      count: scopedLeads.filter(l => l.status === 'Not Interested' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Not Interested' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-rose-100 text-rose-800 font-bold',
       desc: 'Dead leads'
     },
     {
       id: 'Not on WhatsApp',
       label: '📵 Not on WhatsApp',
-      count: scopedLeads.filter(l => l.status === 'Not on WhatsApp' && (selectedCategory === 'ALL' || (l.category || 'General Business') === selectedCategory)).length,
+      count: scopedLeads.filter(l => l.status === 'Not on WhatsApp' && (selectedCategory === 'ALL' || (l.category || l.industry || 'General Business') === selectedCategory)).length,
       badgeClass: 'bg-slate-200 text-slate-800 font-bold',
       desc: 'Numbers not registered on WhatsApp'
     }
   ];
 
-  // Export current leads view to real Excel (.xlsx) file
+  // Export current leads view to real Excel (.xlsx) file with all 7 sections
   const handleExportLeadsExcel = () => {
     const exportRows = filteredLeads.map(l => ({
       "Lead ID": l.id,
       "Customer Reference": l.customerId,
-      "Lead / Company Name": l.name,
-      "Business Category": l.category || "General Business",
-      "Calling Timings": getCategoryConfig(l.category).timings,
+      // 1. Business Name
+      "Business Name": l.name,
+      "Contact Person": l.contactPerson || '',
+      // 2. Contact
       "Phone Number": l.phone,
       "Email Address": l.email,
+      // 3. Address
+      "Address": l.address || '',
+      "City": l.city || '',
+      "State": l.state || '',
+      "Postal Code": l.postalCode || '',
+      "Country": l.country || '',
+      // 4. Industry
+      "Industry / Category": l.industry || l.category || "General Business",
+      "Calling Timings": getCategoryConfig(l.category || l.industry).timings,
+      // 5. Website & Socials
       "Website": l.website || '',
       "Instagram": l.instagram || '',
-      "TikTok": l.tiktok || '',
+      "Facebook": l.facebook || '',
       "LinkedIn": l.linkedin || '',
+      "TikTok": l.tiktok || '',
       "YouTube": l.youtube || '',
+      "Twitter": l.twitter || '',
+      // 6. Reviews
+      "Rating": l.rating || '',
+      "Total Reviews": l.reviewCount || '',
+      "Reviews Feedback": l.reviews || '',
+      // Pipeline metadata
       "Assigned Agent": l.assignedAgent,
       "Pipeline Status": l.status,
       "Source Origin": l.source,
@@ -192,12 +220,12 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Leads_Pipeline");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Leads_Pipeline_7_Sections");
     XLSX.writeFile(workbook, `OmniFlow_Leads_${selectedCategory === 'ALL' ? 'All' : selectedCategory}_${new Date().toISOString().split('T')[0]}.xlsx`);
 
     addToast({
       title: 'Excel Export Complete',
-      message: `Exported ${exportRows.length} active leads to .xlsx file.`,
+      message: `Exported ${exportRows.length} active leads with all 7 sections to .xlsx file.`,
       type: 'success'
     });
   };
@@ -216,30 +244,48 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
     setActiveNoteLeadId(null);
   };
 
+  const handleTriggerUpload = () => {
+    if (onOpenUpload) {
+      onOpenUpload();
+    } else {
+      setIsLocalUploadOpen(true);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* 1. CLEAN SECTION HEADER */}
+      {/* 1. CLEAN SECTION HEADER WITH UPLOAD RAW DATA BUTTON */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
               {isAgent ? 'My Assigned Leads' : 'Leads Pipeline'}
             </h1>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               {filteredLeads.length} Leads
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Select a business category to target leads during their peak calling hours. Click phone to open WhatsApp.
+            Structured records containing: <strong>Business, Contact, Address, Industry, Socials, Website & Reviews</strong>. Click phone for 1-tap WhatsApp.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto shrink-0">
+          {/* UPLOAD RAW DATA BUTTON */}
+          <button
+            onClick={handleTriggerUpload}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white text-xs font-extrabold transition-all flex items-center gap-1.5 shadow-sm shadow-blue-500/25 cursor-pointer"
+            title="Upload raw spreadsheet or paste data to auto-organize into leads"
+          >
+            <Upload className="w-4 h-4" />
+            <span>📥 Upload Raw Data</span>
+          </button>
+
           {onOpenAddLead && (
             <button
               onClick={onOpenAddLead}
               className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-emerald-500/25 cursor-pointer"
-              title="Add a new lead directly into pipeline"
+              title="Add a single new lead directly into pipeline"
             >
               <UserPlus className="w-4 h-4" />
               <span>+ Add Lead</span>
@@ -249,7 +295,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
           <button
             onClick={handleExportLeadsExcel}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-            title="Download current leads list as Excel spreadsheet"
+            title="Download current leads list with all 7 sections as Excel spreadsheet"
           >
             <Download className="w-4 h-4 text-emerald-600" />
             <span className="hidden sm:inline">Export Excel</span>
@@ -258,10 +304,10 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
           {!isAgent && (
             <button
               onClick={() => setActiveTab('customers')}
-              className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-blue-500/25 cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
             >
-              <Database className="w-4 h-4" />
-              <span>Customers Pool</span>
+              <Database className="w-4 h-4 text-blue-600" />
+              <span className="hidden md:inline">Customers Pool</span>
             </button>
           )}
         </div>
@@ -273,7 +319,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
           <div className="flex items-center gap-2">
             <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <Briefcase className="w-3.5 h-3.5 text-blue-600" />
-              <span>Business Category Filter (Timings):</span>
+              <span>Industry / Category Filter (Shift Timings):</span>
             </span>
             {selectedCategory !== 'ALL' && (
               <button
@@ -300,7 +346,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                 : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            <span>All Categories</span>
+            <span>All Industries</span>
             <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
               selectedCategory === 'ALL' ? 'bg-white/20 text-white' : 'bg-white text-slate-700'
             }`}>
@@ -341,7 +387,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
         </div>
       </div>
 
-      {/* 3. STATUS TABS (Horizontally scrollable on mobile) */}
+      {/* 3. STATUS TABS & AGENT FILTER */}
       <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="overflow-x-auto pb-1 sm:pb-0 flex items-center gap-1.5 shrink-0 -mx-1 px-1">
@@ -395,31 +441,29 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
         </div>
       </div>
 
-      {/* 4. MOBILE VIEW: 1-TAP TOUCH CARDS (Shown on phones & small screens) */}
+      {/* 4. MOBILE VIEW: 1-TAP TOUCH CARDS (WITH ALL 7 SECTIONS) */}
       <div className="block md:hidden space-y-3">
         {filteredLeads.length === 0 ? (
           <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
             <PhoneForwarded className="w-8 h-8 mx-auto mb-2 opacity-40 text-blue-600" />
             <p className="font-semibold text-slate-700 text-sm">No leads in this filter</p>
             <p className="text-xs text-slate-400 mt-1 mb-3">
-              Try selecting "All Categories", clearing the filter, or add a new lead directly.
+              Upload raw data or add a new lead directly to get started.
             </p>
-            {onOpenAddLead && (
-              <button
-                onClick={onOpenAddLead}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/20 cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>+ Add New Lead</span>
-              </button>
-            )}
+            <button
+              onClick={handleTriggerUpload}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+            >
+              <Upload className="w-4 h-4" />
+              <span>Upload Raw Data</span>
+            </button>
           </div>
         ) : (
           filteredLeads.map((lead) => {
             const waUrl = formatWhatsAppUrl(lead.phone);
             const telUrl = formatTelUrl(lead.phone);
             const isEditingNote = activeNoteLeadId === lead.id;
-            const catConfig = getCategoryConfig(lead.category);
+            const catConfig = getCategoryConfig(lead.category || lead.industry);
 
             return (
               <div 
@@ -434,41 +478,52 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                     : 'border-slate-200'
                 }`}
               >
-                {/* Header: Name, ID, Category & Timings */}
-                <div className="space-y-1.5">
+                {/* Section 1: Business Name, Contact Person, Industry Badge */}
+                <div className="space-y-1">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-extrabold text-slate-900 text-base leading-snug">
+                        <button
+                          onClick={() => setSelectedLeadForDetails(lead)}
+                          className="font-extrabold text-slate-900 text-base leading-snug hover:text-blue-600 text-left cursor-pointer"
+                        >
                           {lead.name}
-                        </span>
+                        </button>
                         <span className="font-mono text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
                           {lead.id}
                         </span>
                       </div>
-                      {lead.email && (
-                        <p className="text-xs text-slate-400 truncate mt-0.5">
-                          {lead.email}
+
+                      {lead.contactPerson && (
+                        <p className="text-xs text-slate-600 flex items-center gap-1 mt-0.5 font-medium">
+                          <User className="w-3 h-3 text-slate-400" />
+                          <span>Contact Person: <strong className="text-slate-800">{lead.contactPerson}</strong></span>
                         </p>
                       )}
-                      <SocialLinksBadges lead={lead} />
                     </div>
 
-                    <SourceBadge source={lead.source} />
+                    <CategoryBadge category={lead.category || lead.industry} showTimings={false} size="xs" />
                   </div>
 
-                  {/* Category Badge & Shift Timing */}
-                  <div className="flex items-center justify-between gap-2 pt-0.5">
-                    <CategoryBadge category={lead.category} showTimings={true} size="xs" />
-                    
-                    <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5 text-blue-500" />
-                      <span>{catConfig.timings}</span>
-                    </span>
-                  </div>
+                  {/* Section 3: Address & Location */}
+                  {(lead.address || lead.city) && (
+                    <div className="pt-0.5">
+                      <AddressLocation address={lead.address} city={lead.city} state={lead.state} compact={false} />
+                    </div>
+                  )}
+
+                  {/* Section 7: Reviews & Reputation */}
+                  {(lead.rating || lead.reviewCount || lead.reviews) && (
+                    <div className="pt-1">
+                      <ReviewsRating rating={lead.rating} reviewCount={lead.reviewCount} reviews={lead.reviews} showSnippet={true} />
+                    </div>
+                  )}
+
+                  {/* Section 5 & 6: Website & Socials Badges */}
+                  <SocialLinksBadges lead={lead} size="sm" />
                 </div>
 
-                {/* Direct Phone Display (Clicking pushes to WhatsApp) */}
+                {/* Section 2: Contact Phone Bar (1-Tap WhatsApp Push) */}
                 <div className="flex items-center justify-between text-xs bg-slate-50/80 px-3 py-2 rounded-xl border border-slate-100">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-400 text-[11px] font-medium">Contact:</span>
@@ -484,16 +539,17 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                     </a>
                   </div>
 
-                  {!isAgent && (
-                    <span className="text-[11px] text-slate-500 font-medium truncate max-w-[120px]">
-                      👤 {lead.assignedAgent}
-                    </span>
-                  )}
+                  <button
+                    onClick={() => setSelectedLeadForDetails(lead)}
+                    className="text-xs text-blue-600 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Details</span>
+                  </button>
                 </div>
 
-                {/* 1-Tap Big Action Buttons for Mobile Phone */}
+                {/* 1-Tap Big Call Action Buttons */}
                 <div className="grid grid-cols-2 gap-2 pt-0.5">
-                  {/* WhatsApp Push Button */}
                   <a
                     href={waUrl}
                     target="_blank"
@@ -504,7 +560,6 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                     <span>WhatsApp</span>
                   </a>
 
-                  {/* Regular Phone Call Button */}
                   <a
                     href={telUrl}
                     className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-xs shadow-sm shadow-blue-600/25 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
@@ -514,7 +569,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                   </a>
                 </div>
 
-                {/* 1-Tap Status Quick Selector (Super fast for calling team) */}
+                {/* 1-Tap Status Quick Selector */}
                 <div className="pt-2 border-t border-slate-100 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="font-bold uppercase tracking-wider text-slate-400">
@@ -527,7 +582,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                     {[
                       { id: 'Pending', label: '1. Pending', bg: 'bg-amber-500 border-amber-500 text-white' },
                       { id: 'Connected', label: '2. Connected', bg: 'bg-blue-600 border-blue-600 text-white' },
-                      { id: 'Not Connected', label: '3. 📵 Not Connected', bg: 'bg-orange-600 border-orange-600 text-white' },
+                      { id: 'Not Connected', label: '3. 📵 Not Conn.', bg: 'bg-orange-600 border-orange-600 text-white' },
                       { id: 'Interested', label: '4. 🔥 Interested', bg: 'bg-emerald-600 border-emerald-600 text-white' },
                       { id: 'Not Interested', label: '5. ✕ Not Int.', bg: 'bg-rose-600 border-rose-600 text-white' },
                       { id: 'Not on WhatsApp', label: '6. 📵 Not on WA', bg: 'bg-slate-800 border-slate-800 text-white' }
@@ -537,7 +592,7 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                         <button
                           key={st.id}
                           onClick={() => updateLeadStatus(lead.id, st.id)}
-                          className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${st.colSpan || ''} ${
+                          className={`py-2 px-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 ${
                             isSelected
                               ? `${st.bg} shadow-xs font-extrabold`
                               : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -551,235 +606,160 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                   </div>
                 </div>
 
-                {/* Helpful prompt if call was Not Connected */}
-                {lead.status === 'Not Connected' && (
-                  <div className="p-2.5 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <PhoneMissed className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-                      <span className="text-[11px] text-orange-900 font-medium truncate">
-                        Call didn't connect — Tap to redial:
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <a
-                        href={telUrl}
-                        className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs flex items-center gap-1"
-                        title="Redial phone call"
-                      >
-                        <Phone className="w-3 h-3" />
-                        <span>Redial</span>
-                      </a>
-                      <button
-                        onClick={() => updateLeadStatus(lead.id, 'Connected')}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
-                        title="Mark Connected if answered"
-                      >
-                        <span>Connected</span>
-                      </button>
-                    </div>
+                {/* Notes log */}
+                {lead.notes && (
+                  <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600">
+                    <strong className="text-slate-800">Note:</strong> {lead.notes}
                   </div>
                 )}
-
-                {/* Helpful prompt if number is Not on WhatsApp */}
-                {lead.status === 'Not on WhatsApp' && (
-                  <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between gap-2">
-                    <span className="text-[11px] text-slate-700 font-medium">
-                      📵 Number not on WhatsApp — call directly:
-                    </span>
-                    <a
-                      href={telUrl}
-                      className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1 shrink-0"
-                    >
-                      <Phone className="w-3 h-3" />
-                      <span>Phone Call</span>
-                    </a>
-                  </div>
-                )}
-
-                {/* Notes & Call Log Toggle */}
-                <div className="pt-1">
-                  {isEditingNote ? (
-                    <div className="space-y-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-slate-700">Call Log / Note:</span>
-                        <button
-                          onClick={() => setActiveNoteLeadId(null)}
-                          className="text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                      <textarea
-                        rows={2}
-                        value={noteDraft}
-                        onChange={(e) => setNoteDraft(e.target.value)}
-                        placeholder="e.g. Talked on WhatsApp, sent pricing quotation, call back tomorrow..."
-                        className="w-full text-xs p-2 rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      />
-                      <button
-                        onClick={() => handleSaveNote(lead.id, lead.status)}
-                        className="w-full py-1.5 bg-blue-600 text-white font-bold text-xs rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-                      >
-                        Save Note to R2
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <button
-                        onClick={() => handleToggleNoteEdit(lead)}
-                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                        <span>{lead.notes ? 'Edit Note' : '+ Add Note'}</span>
-                      </button>
-
-                      {lead.lastContactDate && (
-                        <span className="text-[10px] text-slate-400">
-                          {lead.lastContactDate}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {lead.notes && !isEditingNote && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px] text-slate-600">
-                      <strong className="text-slate-800">Note:</strong> {lead.notes}
-                    </div>
-                  )}
-                </div>
               </div>
             );
           })
         )}
       </div>
 
-      {/* 5. DESKTOP VIEW: FULL TABLE (Hidden on mobile phones, shown on md and larger) */}
-      <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* 5. DESKTOP VIEW: ADVANCED 7-SECTIONS TABLE */}
+      <div className="hidden md:block bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3.5 px-5">Lead ID</th>
-                <th className="py-3.5 px-5">Lead Name</th>
-                <th className="py-3.5 px-4">Business Category & Timings</th>
-                <th className="py-3.5 px-4">Phone / WhatsApp</th>
-                <th className="py-3.5 px-4">Assigned Agent</th>
-                <th className="py-3.5 px-6 min-w-[220px]">Status (Interactive Dropdown)</th>
-                <th className="py-3.5 px-4">Source / Origin</th>
-                <th className="py-3.5 px-4 text-right">Quick Contact</th>
+              <tr className="bg-slate-50/90 border-b border-slate-200 text-slate-500 font-extrabold uppercase tracking-wider text-[11px]">
+                <th className="py-3.5 px-4 min-w-[200px]">🏢 1. Business Name</th>
+                <th className="py-3.5 px-4 min-w-[170px]">📞 2. Contact (WA & Phone)</th>
+                <th className="py-3.5 px-4 min-w-[190px]">📍 3. Address & Location</th>
+                <th className="py-3.5 px-4 min-w-[150px]">🏭 4. Industry & Timings</th>
+                <th className="py-3.5 px-4 min-w-[170px]">🌐 5 & 6. Web & Socials</th>
+                <th className="py-3.5 px-4 min-w-[130px]">⭐ 7. Reviews</th>
+                <th className="py-3.5 px-4 min-w-[160px]">Status</th>
+                <th className="py-3.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
-                    <PhoneForwarded className="w-8 h-8 mx-auto mb-2 opacity-40 text-blue-600" />
-                    <p className="font-semibold text-slate-600">No leads in this filter</p>
+                  <td colSpan={8} className="py-14 text-center text-slate-400">
+                    <PhoneForwarded className="w-9 h-9 mx-auto mb-2 opacity-40 text-blue-600" />
+                    <p className="font-bold text-slate-700 text-sm">No leads match this view</p>
                     <p className="text-xs text-slate-400 mt-0.5 mb-3">
-                      {leads.length === 0
-                        ? 'No leads found in pipeline. Click below to add a new lead.'
-                        : 'Try changing the category or status tabs, or clearing the search query.'}
+                      Upload raw data or adjust filters to view leads.
                     </p>
-                    {onOpenAddLead && (
-                      <button
-                        onClick={onOpenAddLead}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-sm shadow-emerald-500/20 cursor-pointer"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        <span>+ Add New Lead</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={handleTriggerUpload}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>Upload Raw Data</span>
+                    </button>
                   </td>
                 </tr>
               ) : (
                 filteredLeads.map((lead) => {
                   const waUrl = formatWhatsAppUrl(lead.phone);
                   const telUrl = formatTelUrl(lead.phone);
-                  const catConfig = getCategoryConfig(lead.category);
+                  const catConfig = getCategoryConfig(lead.category || lead.industry);
 
                   return (
                     <tr
                       key={lead.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
+                      className={`hover:bg-slate-50/80 transition-colors group ${
                         lead.status === 'Pending' ? 'bg-amber-50/15' : ''
                       }`}
                     >
-                      <td className="py-3.5 px-5">
+                      {/* SECTION 1: BUSINESS NAME */}
+                      <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <span className="font-mono font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                            {lead.id}
-                          </span>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            from {lead.customerId}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              onClick={() => setSelectedLeadForDetails(lead)}
+                              className="font-extrabold text-slate-900 text-xs hover:text-blue-600 text-left transition-colors cursor-pointer"
+                              title="Click to view all lead sections & sheet details"
+                            >
+                              {lead.name}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-400 font-mono">
+                            <span className="font-bold bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded">
+                              {lead.id}
+                            </span>
+                            {lead.contactPerson && (
+                              <span className="text-slate-600 font-sans font-medium truncate max-w-[120px]">
+                                • 👤 {lead.contactPerson}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-5">
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm leading-tight">
-                            {lead.name}
-                          </p>
-                          <p className="text-[11px] text-slate-400 truncate max-w-xs">
-                            {lead.email || 'No email registered'}
-                          </p>
-                          <SocialLinksBadges lead={lead} />
+                      {/* SECTION 2: CONTACT */}
+                      <td className="py-3.5 px-4 font-mono">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5">
+                            <a 
+                              href={waUrl} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors text-xs font-bold"
+                              title="1-Click WhatsApp Direct Chat"
+                            >
+                              <WhatsAppIcon className="w-3.5 h-3.5 fill-emerald-600 shrink-0" />
+                              <span>{lead.phone}</span>
+                            </a>
+
+                            <a
+                              href={telUrl}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              title="Direct Phone Call"
+                            >
+                              <Phone className="w-3 h-3" />
+                            </a>
+                          </div>
+
+                          {lead.email && (
+                            <p className="text-[11px] text-slate-400 truncate max-w-[150px] font-sans">
+                              {lead.email}
+                            </p>
+                          )}
                         </div>
                       </td>
 
-                      {/* Business Category & Timings */}
+                      {/* SECTION 3: ADDRESS */}
+                      <td className="py-3.5 px-4">
+                        <AddressLocation 
+                          address={lead.address} 
+                          city={lead.city} 
+                          state={lead.state} 
+                          compact={true} 
+                        />
+                      </td>
+
+                      {/* SECTION 4: INDUSTRY & TIMINGS */}
                       <td className="py-3.5 px-4">
                         <div className="space-y-1">
-                          <CategoryBadge category={lead.category} showTimings={true} size="xs" />
+                          <CategoryBadge category={lead.category || lead.industry} showTimings={false} size="xs" />
                           <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                            <Clock className="w-3 h-3 text-blue-500" />
+                            <Clock className="w-2.5 h-2.5 text-blue-500" />
                             <span>{catConfig.timings}</span>
                           </div>
                         </div>
                       </td>
 
-                      {/* Phone Number with 1-Tap WhatsApp Push */}
-                      <td className="py-3.5 px-4 font-mono font-semibold">
-                        <div className="flex items-center gap-2">
-                          <a 
-                            href={waUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors"
-                            title="Click to open WhatsApp Call / Chat"
-                          >
-                            <WhatsAppIcon className="w-3.5 h-3.5 fill-emerald-600 shrink-0" />
-                            <span>{lead.phone}</span>
-                          </a>
-
-                          <a
-                            href={telUrl}
-                            className="p-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Direct Phone Call"
-                          >
-                            <Phone className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-                      </td>
-
+                      {/* SECTION 5 & 6: WEBSITE & SOCIALS */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-700 font-bold flex items-center justify-center text-[10px]">
-                            {lead.assignedAgent ? lead.assignedAgent.split(' ').map(n => n[0]).join('') : 'A'}
-                          </div>
-                          <span className="font-semibold text-slate-800">
-                            {lead.assignedAgent}
-                          </span>
-                        </div>
+                        <SocialLinksBadges lead={lead} size="xs" />
                       </td>
 
-                      <td className="py-3.5 px-6">
+                      {/* SECTION 7: REVIEWS */}
+                      <td className="py-3.5 px-4">
+                        <ReviewsRating rating={lead.rating} reviewCount={lead.reviewCount} compact={true} />
+                      </td>
+
+                      {/* PIPELINE STATUS */}
+                      <td className="py-3.5 px-4">
                         <div className="relative">
                           <select
                             value={lead.status}
                             onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
-                            aria-label={`Update status for ${lead.name}`}
-                            className={`w-full appearance-none pl-3 pr-8 py-1.5 rounded-lg text-xs font-bold border shadow-xs transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+                            className={`w-full appearance-none pl-2.5 pr-7 py-1 rounded-lg text-xs font-bold border shadow-2xs transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
                               lead.status === 'Pending'
                                 ? 'bg-amber-50 border-amber-300 text-amber-900'
                                 : lead.status === 'Connected'
@@ -793,74 +773,33 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
                                 : 'bg-rose-50 border-rose-300 text-rose-900'
                             }`}
                           >
-                            <option value="Pending">1. Pending (Awaiting Outreach)</option>
-                            <option value="Connected">2. Connected (Contact Made)</option>
-                            <option value="Not Connected">3. Not Connected (Call Missed / Busy)</option>
-                            <option value="Interested">4. Interested (Hot Lead 🔥)</option>
-                            <option value="Not Interested">5. Not Interested (Dead Lead ✕)</option>
-                            <option value="Not on WhatsApp">6. Not on WhatsApp (📵)</option>
+                            <option value="Pending">1. Pending</option>
+                            <option value="Connected">2. Connected</option>
+                            <option value="Not Connected">3. Not Connected</option>
+                            <option value="Interested">4. Interested 🔥</option>
+                            <option value="Not Interested">5. Not Interested ✕</option>
+                            <option value="Not on WhatsApp">6. Not on WA 📵</option>
                           </select>
-                          <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
+                          <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
                         </div>
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        <SourceBadge source={lead.source} />
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-1.5">
-                          {/* 1-Click WhatsApp Quick Icon */}
-                          <a
-                            href={waUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
-                            title="Open WhatsApp Chat / Call"
+                      {/* QUICK ACTIONS */}
+                      <td className="py-3.5 px-3 text-right">
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => setSelectedLeadForDetails(lead)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                            title="Inspect all 7 sections & sheet details"
                           >
-                            <WhatsAppIcon className="w-3.5 h-3.5 fill-emerald-600" />
-                          </a>
-
-                          {lead.status === 'Pending' ? (
-                            <div className="inline-flex items-center gap-1">
-                              <button
-                                onClick={() => updateLeadStatus(lead.id, 'Connected')}
-                                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                                title="Mark Connected upon call"
-                              >
-                                <Phone className="w-3 h-3" />
-                                <span>Connected</span>
-                              </button>
-                              <button
-                                onClick={() => updateLeadStatus(lead.id, 'Not Connected')}
-                                className="px-2 py-1 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 font-bold text-[11px] shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                                title="Mark Not Connected (Call did not connect)"
-                              >
-                                <PhoneMissed className="w-3 h-3" />
-                                <span>Not Connected</span>
-                              </button>
-                            </div>
-                          ) : lead.status === 'Not Connected' ? (
-                            <div className="inline-flex items-center gap-1">
-                              <StatusBadge status={lead.status} size="sm" />
-                              <button
-                                onClick={() => updateLeadStatus(lead.id, 'Connected')}
-                                className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-[11px] shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer"
-                                title="Mark Connected on retry"
-                              >
-                                <Phone className="w-3 h-3" />
-                                <span>Connected</span>
-                              </button>
-                            </div>
-                          ) : (
-                            <StatusBadge status={lead.status} size="sm" />
-                          )}
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
 
                           {!isAgent && (
                             <button
                               onClick={() => deleteLead(lead.id)}
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                              title="Remove lead from pipeline"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              title="Delete lead"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -875,6 +814,22 @@ export const LeadsModule = ({ searchQuery, setSearchQuery, onOpenAddLead }) => {
           </table>
         </div>
       </div>
+
+      {/* LEAD DETAILS MODAL: DISPLAYS ALL 7 SECTIONS + ALL SHEET COLUMNS */}
+      {selectedLeadForDetails && (
+        <LeadDetailsModal
+          lead={selectedLeadForDetails}
+          isOpen={Boolean(selectedLeadForDetails)}
+          onClose={() => setSelectedLeadForDetails(null)}
+        />
+      )}
+
+      {/* RAW DATA UPLOAD MODAL */}
+      <BulkUploadModal
+        isOpen={isLocalUploadOpen}
+        onClose={() => setIsLocalUploadOpen(false)}
+        initialTarget="leads"
+      />
     </div>
   );
 };

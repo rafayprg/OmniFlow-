@@ -239,6 +239,70 @@ export const CrmProvider = ({ children }) => {
     }
   }, [addToast]);
 
+  // 1b. BULK UPLOAD RAW LEADS strictly to Cloudflare R2
+  const bulkUploadLeads = useCallback(async (newRecords, fileName = 'Imported_Leads.xlsx') => {
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ records: newRecords, fileName })
+      });
+
+      if (!res.ok) {
+        throw new Error(`Failed to upload to Cloudflare R2 (Status: ${res.status})`);
+      }
+
+      const result = await res.json();
+      const savedRecords = Array.isArray(result.data) ? result.data : [];
+
+      // Update state with records saved to Cloudflare R2
+      setLeads(prev => [...savedRecords, ...prev]);
+
+      addToast({
+        title: 'Raw Leads Ingested & Organized',
+        message: `Successfully organized and added ${savedRecords.length} leads to Cloudflare R2 from "${fileName}".`,
+        type: 'success'
+      });
+
+      return savedRecords;
+    } catch (err) {
+      console.error('Cloudflare R2 bulk leads upload error:', err);
+      addToast({
+        title: 'Upload Failed',
+        message: 'Could not write to Cloudflare R2: ' + err.message,
+        type: 'error'
+      });
+      return [];
+    }
+  }, [addToast]);
+
+  // Update lead entire details
+  const updateLeadDetails = useCallback(async (leadId, updateData) => {
+    setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...updateData } : l));
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+      if (!res.ok) throw new Error('Lead update failed');
+      addToast({
+        title: 'Lead Updated',
+        message: 'Lead details synchronized with Cloudflare R2.',
+        type: 'success'
+      });
+      return true;
+    } catch (err) {
+      console.error('Lead update error:', err);
+      addToast({
+        title: 'Update Error',
+        message: err.message,
+        type: 'error'
+      });
+      return false;
+    }
+  }, [addToast]);
+
   // 2. ASSIGN CUSTOMERS TO AGENT strictly in Cloudflare R2
   const assignCustomersToAgent = useCallback(async (customerIds, agentName) => {
     if (!customerIds || customerIds.length === 0) {
@@ -1004,9 +1068,11 @@ export const CrmProvider = ({ children }) => {
     addToast,
     removeToast,
     bulkUploadCustomers,
+    bulkUploadLeads,
     assignCustomersToAgent,
     updateLeadStatus,
     updateLeadCategory,
+    updateLeadDetails,
     updateCustomerCategory,
     addSingleCustomer,
     addLead,

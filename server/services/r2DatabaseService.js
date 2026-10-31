@@ -263,24 +263,56 @@ class R2DatabaseService {
     const today = new Date().toISOString().split('T')[0];
     const nextNum = 1001 + leads.length;
 
+    const name = leadData.name ? String(leadData.name).trim() : 'Unnamed Lead';
+    const industry = leadData.industry ? String(leadData.industry).trim() : (leadData.category ? String(leadData.category).trim() : 'General Business');
+    const category = leadData.category ? String(leadData.category).trim() : industry;
+
     const newLead = {
       id: leadData.id || `LEAD-${nextNum}`,
       customerId: leadData.customerId || `DIRECT-${Date.now()}`,
-      name: leadData.name ? leadData.name.trim() : 'Unnamed Lead',
-      phone: leadData.phone ? leadData.phone.trim() : '0300-0000000',
-      email: leadData.email ? leadData.email.trim() : '',
+      
+      // 1. Business Name
+      name,
+      contactPerson: leadData.contactPerson ? String(leadData.contactPerson).trim() : '',
+
+      // 2. Contact
+      phone: leadData.phone ? String(leadData.phone).trim() : '0300-0000000',
+      email: leadData.email ? String(leadData.email).trim() : '',
+
+      // 3. Address
+      address: leadData.address ? String(leadData.address).trim() : '',
+      city: leadData.city ? String(leadData.city).trim() : 'Karachi',
+      state: leadData.state ? String(leadData.state).trim() : '',
+      postalCode: leadData.postalCode ? String(leadData.postalCode).trim() : '',
+      country: leadData.country ? String(leadData.country).trim() : '',
+
+      // 4. Industry
+      industry,
+      category,
+
+      // 5. Socials & 6. Website
+      website: leadData.website ? String(leadData.website).trim() : '',
+      instagram: leadData.instagram ? String(leadData.instagram).trim() : '',
+      facebook: leadData.facebook ? String(leadData.facebook).trim() : '',
+      linkedin: leadData.linkedin ? String(leadData.linkedin).trim() : '',
+      tiktok: leadData.tiktok ? String(leadData.tiktok).trim() : '',
+      youtube: leadData.youtube ? String(leadData.youtube).trim() : '',
+      twitter: leadData.twitter ? String(leadData.twitter).trim() : '',
+      socials: leadData.socials || {},
+
+      // 7. Reviews
+      rating: leadData.rating !== undefined && leadData.rating !== null && leadData.rating !== '' ? leadData.rating : null,
+      reviewCount: leadData.reviewCount !== undefined && leadData.reviewCount !== null && leadData.reviewCount !== '' ? leadData.reviewCount : null,
+      reviews: leadData.reviews ? String(leadData.reviews).trim() : '',
+
+      // All remaining raw sheet details
+      rawDetails: leadData.rawDetails || {},
+
       source: leadData.source || 'Manual Team Entry',
-      category: leadData.category ? leadData.category.trim() : 'General Business',
-      city: leadData.city ? leadData.city.trim() : 'Karachi',
       assignedAgent: leadData.assignedAgent || 'Unassigned',
       status: leadData.status || 'Pending',
-      website: leadData.website ? leadData.website.trim() : '',
-      instagram: leadData.instagram ? leadData.instagram.trim() : '',
-      tiktok: leadData.tiktok ? leadData.tiktok.trim() : '',
-      linkedin: leadData.linkedin ? leadData.linkedin.trim() : '',
-      youtube: leadData.youtube ? leadData.youtube.trim() : '',
-      notes: leadData.notes ? leadData.notes.trim() : 'Directly entered by team member.',
-      assignedDate: today,
+      notes: leadData.notes ? String(leadData.notes).trim() : 'Directly entered by team member.',
+      assignedDate: leadData.assignedDate || today,
       lastContactDate: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -289,6 +321,73 @@ class R2DatabaseService {
     leads.unshift(newLead);
     await this.saveToR2('leads', leads);
     return newLead;
+  }
+
+  async bulkAddLeads(records) {
+    const leads = await this.getLeads();
+    const today = new Date().toISOString().split('T')[0];
+    let nextNum = 1001 + leads.length;
+
+    const newItems = records.map(rec => {
+      const name = rec.name ? String(rec.name).trim() : 'Unnamed Business';
+      const industry = rec.industry ? String(rec.industry).trim() : (rec.category ? String(rec.category).trim() : 'General Business');
+      const category = rec.category ? String(rec.category).trim() : industry;
+
+      return {
+        id: rec.id || `LEAD-${nextNum++}`,
+        customerId: rec.customerId || `RAW-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        
+        // 1. Business Name
+        name,
+        contactPerson: rec.contactPerson ? String(rec.contactPerson).trim() : '',
+
+        // 2. Contact
+        phone: rec.phone ? String(rec.phone).trim() : '0300-0000000',
+        email: rec.email ? String(rec.email).trim() : '',
+
+        // 3. Address
+        address: rec.address ? String(rec.address).trim() : '',
+        city: rec.city ? String(rec.city).trim() : 'Karachi',
+        state: rec.state ? String(rec.state).trim() : '',
+        postalCode: rec.postalCode ? String(rec.postalCode).trim() : '',
+        country: rec.country ? String(rec.country).trim() : '',
+
+        // 4. Industry
+        industry,
+        category,
+
+        // 5. Socials & 6. Website
+        website: rec.website ? String(rec.website).trim() : '',
+        instagram: rec.instagram ? String(rec.instagram).trim() : '',
+        facebook: rec.facebook ? String(rec.facebook).trim() : '',
+        linkedin: rec.linkedin ? String(rec.linkedin).trim() : '',
+        tiktok: rec.tiktok ? String(rec.tiktok).trim() : '',
+        youtube: rec.youtube ? String(rec.youtube).trim() : '',
+        twitter: rec.twitter ? String(rec.twitter).trim() : '',
+        socials: rec.socials || {},
+
+        // 7. Reviews
+        rating: rec.rating !== undefined && rec.rating !== null && rec.rating !== '' ? rec.rating : null,
+        reviewCount: rec.reviewCount !== undefined && rec.reviewCount !== null && rec.reviewCount !== '' ? rec.reviewCount : null,
+        reviews: rec.reviews ? String(rec.reviews).trim() : '',
+
+        // All other spreadsheet columns preserved
+        rawDetails: rec.rawDetails || {},
+
+        assignedAgent: rec.assignedAgent || 'Unassigned',
+        status: rec.status || 'Pending',
+        source: rec.source || 'Raw Sheet Upload',
+        notes: rec.notes ? String(rec.notes).trim() : 'Imported from raw data upload.',
+        assignedDate: rec.assignedDate || today,
+        lastContactDate: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    });
+
+    leads.unshift(...newItems);
+    await this.saveToR2('leads', leads);
+    return newItems;
   }
 
   async updateLeadStatus(id, status, notes) {
@@ -318,6 +417,21 @@ class R2DatabaseService {
 
     leads[idx].category = (category || 'General Business').trim();
     leads[idx].updatedAt = new Date().toISOString();
+
+    await this.saveToR2('leads', leads);
+    return leads[idx];
+  }
+
+  async updateLead(id, updateFields) {
+    const leads = await this.getLeads();
+    const idx = leads.findIndex(l => l.id === id);
+    if (idx === -1) return null;
+
+    leads[idx] = {
+      ...leads[idx],
+      ...updateFields,
+      updatedAt: new Date().toISOString()
+    };
 
     await this.saveToR2('leads', leads);
     return leads[idx];

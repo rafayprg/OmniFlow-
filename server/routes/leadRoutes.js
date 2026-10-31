@@ -18,6 +18,38 @@ router.get('/', async (req, res) => {
   }
 });
 
+// POST bulk upload leads strictly to Cloudflare R2
+router.post('/bulk', async (req, res) => {
+  try {
+    const { records, fileBase64, fileName } = req.body;
+    if (!Array.isArray(records) || records.length === 0) {
+      return res.status(400).json({ success: false, error: 'Records array is required' });
+    }
+
+    // Optional raw file backup in R2 uploads
+    let uploadedFileMeta = null;
+    if (fileBase64 && fileName) {
+      try {
+        const buffer = Buffer.from(fileBase64, 'base64');
+        uploadedFileMeta = await r2Db.uploadFile(fileName, buffer);
+      } catch (uploadErr) {
+        console.warn('Could not store raw excel file in R2 uploads:', uploadErr.message);
+      }
+    }
+
+    const inserted = await r2Db.bulkAddLeads(records);
+    res.status(201).json({
+      success: true,
+      count: inserted.length,
+      data: inserted,
+      fileUpload: uploadedFileMeta,
+      source: 'cloudflare-r2'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST create new lead directly in Cloudflare R2
 router.post('/', async (req, res) => {
   try {
@@ -115,6 +147,27 @@ router.put('/:id/category', async (req, res) => {
     res.json({
       success: true,
       message: 'Category updated in Cloudflare R2',
+      data: updated,
+      source: 'cloudflare-r2'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT update single lead entire details
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await r2Db.updateLead(id, req.body);
+
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Lead not found in Cloudflare R2' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead updated in Cloudflare R2',
       data: updated,
       source: 'cloudflare-r2'
     });
